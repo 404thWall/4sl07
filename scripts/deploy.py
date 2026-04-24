@@ -15,7 +15,10 @@ REMOTE_PATH = "~/4sl07/deploy/"
 def kill_previous_sessions(user: str) -> None:
     with open("deployed_hosts.txt", "a+") as f:
         f.seek(0)
+        i = 0
         for line in f:
+            i += 1
+            print(f"[{line.strip()}] killing previous session ({i})...")
             host = line.strip()
             try:
                 subprocess.run(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"], check=True)
@@ -23,6 +26,10 @@ def kill_previous_sessions(user: str) -> None:
                 print(f"[{host}] failed to kill session (exit {e.returncode}), maybe it was already killed?", file=sys.stderr)
                 pass  # Ignore errors (e.g. session not found)
             time.sleep(1)
+            if i % 30 == 0:
+                print("Sleeping for 15 seconds to avoid overloading the machines...")
+                time.sleep(15)
+                print("Resuming...")
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
