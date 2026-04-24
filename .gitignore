@@ -2,3 +2,4 @@
 !/target/release/
 !/target/release/slr07
 /splits
+**/__pycache__
