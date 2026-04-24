@@ -19,8 +19,10 @@ def kill_previous_sessions(user: str) -> None:
             host = line.strip()
             try:
                 subprocess.run(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"], check=True)
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as e:
+                print(f"[{host}] failed to kill session (exit {e.returncode}), maybe it was already killed?", file=sys.stderr)
                 pass  # Ignore errors (e.g. session not found)
+            time.sleep(1)
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
@@ -77,6 +79,7 @@ def main() -> int:
             print(f"[{host}] starting ({i}/{len(hosts)})...")
             ssh_run(args.user, host, args.file, args.cmd)
             f.write(f"{host}\n")
+            f.flush()
             time.sleep(1)
 
     return 0
