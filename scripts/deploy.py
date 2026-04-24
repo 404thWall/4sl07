@@ -11,6 +11,15 @@ from machines import MachineState
 
 REMOTE_PATH = "~/4sl07/deploy/"
 
+def kill_previous_sessions(user: str) -> None:
+    with open("deployed_hosts.txt", "r") as f:
+        for line in f:
+            host = line.strip()
+            try:
+                subprocess.run(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"], check=True)
+            except subprocess.CalledProcessError:
+                pass  # Ignore errors (e.g. session not found)
+
 def scp(user: str, host: str, file: Path) -> None:
     try:
         subprocess.run(["ssh", f"{user}@{host}", f"mkdir -p {REMOTE_PATH}"], check=True)
@@ -48,6 +57,9 @@ def main() -> int:
     if not hosts:
         print("No free machines available.", file=sys.stderr)
         return 1
+    
+    print("Killing previous sessions...")
+    kill_previous_sessions(args.user)
 
     print(f"[{hosts[0]}] scp...")
     scp(args.user, hosts[0], args.file)
