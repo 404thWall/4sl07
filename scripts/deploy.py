@@ -9,19 +9,21 @@ import sys
 from pathlib import Path
 from machines import MachineState
 
-REMOTE_PATH = "/tmp/"
+REMOTE_PATH = "~/4sl07/deploy/"
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
+        subprocess.run(["ssh", f"{user}@{host}", f"mkdir -p {REMOTE_PATH}"], check=True)
         subprocess.run(["scp", str(file), f"{user}@{host}:{REMOTE_PATH}"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"[{host}] scp failed (exit {e.returncode})", file=sys.stderr)
         raise
 
 
-def ssh_run(user: str, host: str, file: Path) -> None:
+def ssh_run(user: str, host: str, file: Path, cmd: str | None = None) -> None:
+    command = cmd if cmd else f"{REMOTE_PATH}{file.name}"
     try:
-        subprocess.run(["ssh", f"{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} && {REMOTE_PATH}{file.name}"], check=True)
+        subprocess.run(["ssh", f"{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"[{host}] ssh failed (exit {e.returncode})", file=sys.stderr)
         raise
@@ -32,6 +34,7 @@ def main() -> int:
     parser.add_argument("file", type=Path, help="File to deploy")
     parser.add_argument("--user", required=True, help="SSH username")
     parser.add_argument("--count", type=int, default=4, help="Number of machines")
+    parser.add_argument("--cmd", type=str, help="Command to run instead of the file")
     args = parser.parse_args()
 
     if not args.file.exists():
@@ -51,7 +54,7 @@ def main() -> int:
 
     for host in hosts:
         print(f"[{host}] starting...")
-        ssh_run(args.user, host, args.file)
+        ssh_run(args.user, host, args.file, args.cmd)
 
     return 0
 
