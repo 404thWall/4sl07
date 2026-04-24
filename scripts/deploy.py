@@ -77,10 +77,14 @@ def main() -> int:
         for host in hosts:
             i += 1
             print(f"[{host}] starting ({i}/{len(hosts)})...")
-            ssh_run(args.user, host, args.file, args.cmd)
             f.write(f"{host}\n")
             f.flush()
+            ssh_run(args.user, host, args.file, args.cmd)
             time.sleep(1)
+            if i % 30 == 0:
+                print("Sleeping for 15 seconds to avoid overloading the machines...")
+                time.sleep(15)
+                print("Resuming...")
 
     return 0
 
