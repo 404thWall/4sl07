@@ -70,13 +70,9 @@ def scp(user: str, host: str, file: Path) -> None:
         raise
 
 
-def ssh_run(user: str, host: str, file: Path, cmd: str | None = None) -> None:
+def ssh_run(user: str, hosts: list[str], file: Path, cmd: str | None = None) -> None:
     command = cmd if cmd else f"{REMOTE_PATH}{file.name}"
-    try:
-        run_command(["ssh", f"{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"])
-    except subprocess.CalledProcessError as e:
-        print(f"[{host}] ssh failed (exit {e.returncode})", file=sys.stderr)
-        raise
+    run_command_batch(["ssh", "{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"], user, hosts)
 
 
 def main() -> int:
@@ -110,18 +106,16 @@ def main() -> int:
     scp(args.user, hosts[0], args.file)
 
     with open("deployed_hosts.txt", "w+") as f:
-        i = 0
-        for host in hosts:
-            i += 1
-            print(f"[{host}] starting ({i}/{len(hosts)})...")
-            f.write(f"{host}\n")
+        batch_size = 5
+        for i in range(0, len(hosts), batch_size):
+            batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
+            for host in batch_hosts:
+                f.write(f"{host}\n")
             f.flush()
-            ssh_run(args.user, host, args.file, args.cmd)
+
+            print(f"Running on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
+            ssh_run(args.user, batch_hosts, args.file, args.cmd)
             time.sleep(1)
-            if i % 30 == 0:
-                print("Sleeping for 15 seconds to avoid overloading the machines...")
-                time.sleep(15)
-                print("Resuming...")
 
     return 0
 
