@@ -6,13 +6,15 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
 from machines import MachineState
 
 REMOTE_PATH = "~/4sl07/deploy/"
 
 def kill_previous_sessions(user: str) -> None:
-    with open("deployed_hosts.txt", "r") as f:
+    with open("deployed_hosts.txt", "a+") as f:
+        f.seek(0)
         for line in f:
             host = line.strip()
             try:
@@ -44,7 +46,14 @@ def main() -> int:
     parser.add_argument("--user", required=True, help="SSH username")
     parser.add_argument("--count", type=int, default=4, help="Number of machines")
     parser.add_argument("--cmd", type=str, help="Command to run instead of the file")
+    parser.add_argument("--kill", help="Only kill previous sessions, do not deploy or run anything", action="store_true")
     args = parser.parse_args()
+
+    print("Killing previous sessions...")
+    kill_previous_sessions(args.user)
+
+    if args.kill:
+        return 0
 
     if not args.file.exists():
         print(f"File not found: {args.file}", file=sys.stderr)
@@ -57,20 +66,18 @@ def main() -> int:
     if not hosts:
         print("No free machines available.", file=sys.stderr)
         return 1
-    
-    print("Killing previous sessions...")
-    kill_previous_sessions(args.user)
 
     print(f"[{hosts[0]}] scp...")
     scp(args.user, hosts[0], args.file)
 
-    for host in hosts:
-        print(f"[{host}] starting...")
-        ssh_run(args.user, host, args.file, args.cmd)
-
-    with open("deployed_hosts.txt", "w") as f:
+    with open("deployed_hosts.txt", "w+") as f:
+        i = 0
         for host in hosts:
+            i += 1
+            print(f"[{host}] starting ({i}/{len(hosts)})...")
+            ssh_run(args.user, host, args.file, args.cmd)
             f.write(f"{host}\n")
+            time.sleep(1)
 
     return 0
 
