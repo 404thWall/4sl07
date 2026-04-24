@@ -9,8 +9,19 @@ import sys
 import time
 from pathlib import Path
 from machines import MachineState
+from multiprocessing import Process
 
 REMOTE_PATH = "~/4sl07/deploy/"
+
+def run_command(cmd: list[str]):
+    process = Process(target=subprocess.run, args=(cmd,), kwargs={"check": True})
+    process.start()
+    process.join(timeout=10)
+    if process.is_alive():
+        print(f"Command is still running after 10 seconds, killing it to avoid overloading the machines...")
+        process.terminate()
+        process.join()
+    
 
 def kill_previous_sessions(user: str) -> None:
     with open("deployed_hosts.txt", "a+") as f:
@@ -21,7 +32,7 @@ def kill_previous_sessions(user: str) -> None:
             print(f"[{line.strip()}] killing previous session ({i})...")
             host = line.strip()
             try:
-                subprocess.run(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"], check=True)
+                run_command(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"])
             except subprocess.CalledProcessError as e:
                 print(f"[{host}] failed to kill session (exit {e.returncode}), maybe it was already killed?", file=sys.stderr)
                 pass  # Ignore errors (e.g. session not found)
@@ -33,8 +44,8 @@ def kill_previous_sessions(user: str) -> None:
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
-        subprocess.run(["ssh", f"{user}@{host}", f"mkdir -p {REMOTE_PATH}"], check=True)
-        subprocess.run(["scp", str(file), f"{user}@{host}:{REMOTE_PATH}"], check=True)
+        run_command(["ssh", f"{user}@{host}", f"mkdir -p {REMOTE_PATH}"])
+        run_command(["scp", str(file), f"{user}@{host}:{REMOTE_PATH}"])
     except subprocess.CalledProcessError as e:
         print(f"[{host}] scp failed (exit {e.returncode})", file=sys.stderr)
         raise
@@ -43,7 +54,7 @@ def scp(user: str, host: str, file: Path) -> None:
 def ssh_run(user: str, host: str, file: Path, cmd: str | None = None) -> None:
     command = cmd if cmd else f"{REMOTE_PATH}{file.name}"
     try:
-        subprocess.run(["ssh", f"{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"], check=True)
+        run_command(["ssh", f"{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"])
     except subprocess.CalledProcessError as e:
         print(f"[{host}] ssh failed (exit {e.returncode})", file=sys.stderr)
         raise
