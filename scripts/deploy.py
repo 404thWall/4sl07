@@ -12,6 +12,33 @@ from machines import MachineState
 from multiprocessing import Process
 
 REMOTE_PATH = "~/4sl07/deploy/"
+CMD_TIMEOUT = 15  # seconds
+
+def run_process(cmd: list[str]):
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed (exit {e.returncode})", file=sys.stderr)
+
+def run_command_batch(cmd: list[str], user: str, hosts: list[str]):
+    '''
+    Run a command on multiple hosts in parallel using multiprocessing.
+    The executed command is `cmd user@host cmd_args...`.
+    '''
+    processes: list[tuple[str, Process]] = []
+    for host in hosts:
+        command = [c.format(host=host, user=user) for c in cmd]
+        process = Process(target=run_process, args=(command,))
+        process.start()
+        processes.append((host, process))
+    
+    start_time = time.time()
+    for host, process in processes:
+        process.join(timeout=max(0, CMD_TIMEOUT - (time.time() - start_time)))
+        if process.is_alive():
+            print(f"[{host}] Command is still running after {CMD_TIMEOUT} seconds, killing it to avoid a blocking situation...")
+            process.terminate()
+            process.join()
 
 def run_command(cmd: list[str]):
     process = Process(target=subprocess.run, args=(cmd,), kwargs={"check": True})
@@ -26,21 +53,13 @@ def run_command(cmd: list[str]):
 def kill_previous_sessions(user: str) -> None:
     with open("deployed_hosts.txt", "a+") as f:
         f.seek(0)
-        i = 0
-        for line in f:
-            i += 1
-            print(f"[{line.strip()}] killing previous session ({i})...")
-            host = line.strip()
-            try:
-                run_command(["ssh", f"{user}@{host}", "tmux kill-session -t 4sl07"])
-            except subprocess.CalledProcessError as e:
-                print(f"[{host}] failed to kill session (exit {e.returncode}), maybe it was already killed?", file=sys.stderr)
-                pass  # Ignore errors (e.g. session not found)
+        hosts = [line.strip() for line in f if line.strip()]
+        batch_size = 5
+        for i in range(0, len(hosts), batch_size):
+            batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
+            print(f"Killing sessions on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
+            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07"], user, batch_hosts)
             time.sleep(1)
-            if i % 30 == 0:
-                print("Sleeping for 15 seconds to avoid overloading the machines...")
-                time.sleep(15)
-                print("Resuming...")
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
