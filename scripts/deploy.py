@@ -56,6 +56,10 @@ def main() -> int:
         print(f"[{host}] starting...")
         ssh_run(args.user, host, args.file, args.cmd)
 
+    with open("deployed_hosts.txt", "w") as f:
+        for host in hosts:
+            f.write(f"{host}\n")
+
     return 0
 
 
