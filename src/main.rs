@@ -11,6 +11,7 @@ fn run() -> std::io::Result<()> {
     let mut file = File::open("./splits/CC-MAIN-20230321002050-20230321032050-00486.warc.wet")?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
+    contents.make_ascii_lowercase();
 
     let words = contents.split(|c: char| {
         c == ' ' || c == '\n' || c == '\r' || c == '.' || c == ',' || 
