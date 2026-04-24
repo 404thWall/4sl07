@@ -3,3 +3,4 @@
 !/target/release/slr07
 /splits
 **/__pycache__
+**/deployed_hosts.txt
