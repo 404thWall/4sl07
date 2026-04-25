@@ -4,3 +4,4 @@
 /splits
 **/__pycache__
 **/deployed_hosts.txt
+**/deploy_command.json
