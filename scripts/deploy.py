@@ -131,7 +131,6 @@ def main() -> int:
 
     if args.save:
         save_config(vars(args))
-        print(f"Config updated in {CONFIG_FILE}")
 
     print(f"Deploying using {args}")
 

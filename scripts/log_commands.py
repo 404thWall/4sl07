@@ -23,6 +23,7 @@ def save_config(args_dict):
     }
     with open(CONFIG_FILE, "w") as f:
         json.dump(to_save, f, indent=4)
+        print(f"Config updated in {CONFIG_FILE}")
 
 def log_execution(args_dict: dict, status: str = "started", session_id: str = None) -> str:
     """
@@ -60,6 +61,6 @@ def log_execution(args_dict: dict, status: str = "started", session_id: str = No
                         data["end_time"] = now
                     lines.append(json.dumps(data))
             
-            with open(LOG_FILE, "w") as f:
+            with open(HISTORY_FILE, "w") as f:
                 f.write("\n".join(lines) + "\n")
         return session_id
