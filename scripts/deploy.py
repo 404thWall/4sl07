@@ -7,32 +7,13 @@ import argparse
 import subprocess
 import sys
 import time
-import json
 from pathlib import Path
 from machines import MachineState
 from multiprocessing import Process
+from log_commands import load_config, save_config, log_execution
 
 REMOTE_PATH = "~/4sl07/deploy/"
 CMD_TIMEOUT = 15  # seconds
-CONFIG_FILE = Path("./deploy_command.json")
-
-def load_config():
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-def save_config(args_dict):
-    to_save = {
-        k: (str(v) if isinstance(v, Path) else v) 
-        for k, v in args_dict.items() 
-        if k not in ['save', 'kill'] and v is not None
-    }
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(to_save, f, indent=4)
 
 def run_process(cmd: list[str]):
     try:
@@ -123,23 +104,28 @@ def main() -> int:
     parser.add_argument("--no-save", action="store_false", dest="save")
 
     args = parser.parse_args()
+    session_id = log_execution(vars(args), status="running")
 
     if not args.user:
+        log_execution(vars(args), status="error", session_id=session_id)
         parser.error("--user is required to do anything (none found in CLI or memory)")
 
     print("Killing previous sessions...")
     kill_previous_sessions(args.user)
 
     if args.kill:
+        log_execution(vars(args), status="success", session_id=session_id)
         return 0
     
     missing = []
     if not args.file: missing.append("file (positional)")
     if not args.user: missing.append("--user")
     if missing:
+        log_execution(vars(args), status="error", session_id=session_id)
         parser.error(f"Missing required parameters: {', '.join(missing)}")
 
     if not args.file.exists():
+        log_execution(vars(args), status="error", session_id=session_id)
         print(f"File not found: {args.file}", file=sys.stderr)
         return 1
 
@@ -171,6 +157,8 @@ def main() -> int:
             print(f"Running on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
             ssh_run(args.user, batch_hosts, args.file, args.cmd)
             time.sleep(1)
+
+    log_execution(vars(args), status="success", session_id=session_id)
 
     return 0
 

@@ -5,3 +5,4 @@
 **/__pycache__
 **/deployed_hosts.txt
 **/deploy_command.json
+**/deploy_history.jsonl
