@@ -82,7 +82,7 @@ async fn main() {
         },
         Mode::Client => {
             println!("Starting in client mode...");
-            if let Err(e) = management_protocole::client::start_client("127.0.0.1:9000", 5).await {
+            if let Err(e) = management_protocole::client::start_client("127.0.0.1:9000").await {
                 eprintln!("Client error: {}", e);
             }
         },

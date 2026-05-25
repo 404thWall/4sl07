@@ -2,19 +2,39 @@ use crate::management_protocole::{Packet, ProtocolError, CommandCodec};
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_util::codec::{Framed};
+use tokio::sync::mpsc::Sender;
 
 pub async fn start_server(addr: &str) -> Result<(), ProtocolError> {
     let listener = TcpListener::bind(addr).await?;
 
     loop {
         let (socket, addr) = listener.accept().await?;
+        
+        // Wrap the socket with our codec
+        let framed = Framed::new(socket, CommandCodec);
+        
+        let (mut sender, mut receiver) = framed.split();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+
+        let writer_task = tokio::spawn(async move {
+            while let Some(packet) = rx.recv().await {
+                if let Err(e) = sender.send(packet).await {
+                    eprintln!("send error: {}", e);
+                    break;
+                }
+            }
+        });
+
+        let mut ping_tx = tx.clone();
+        tokio::spawn(async move {
+            server_ping_task(&mut ping_tx).await;
+        });
+
+        let send_back_tx = tx.clone();
         tokio::spawn(async move {
             println!("New connection from {}", addr);
 
-            // Wrap the socket with our codec
-            let mut framed = Framed::new(socket, CommandCodec);
-
-            while let Some(result) = framed.next().await {
+            while let Some(result) = receiver.next().await {
                 let response = match result {
                     Ok(cmd) => server_handle_packet(cmd).await,
                     Err(e) => {
@@ -24,15 +44,28 @@ pub async fn start_server(addr: &str) -> Result<(), ProtocolError> {
                 };
 
                 if let Ok(Some(packet)) = response {
-                    if let Err(e) = framed.send(packet).await {
+                    if let Err(e) = send_back_tx.send(packet).await {
                         eprintln!("Failed to send response: {}", e);
                         break;
                     }
                 }
             }
 
+            drop(tx);
+            let _ = writer_task.await;
+
             println!("Connection from {} closed", addr);
         });
+    }
+}
+
+async fn server_ping_task(tx: &mut Sender<Packet>) {
+    let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(10));
+    loop {
+        ticker.tick().await;
+        if tx.send(Packet::Ping).await.is_err() {
+            break;
+        }
     }
 }
 
