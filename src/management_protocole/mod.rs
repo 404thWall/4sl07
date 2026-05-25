@@ -1,19 +1,29 @@
 // This module defines the management protocol for our key-value store.
 // It was inspired by https://oneuptime.com/blog/post/2026-01-25-tcp-protocols-tokio-codec-rust/view
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use tokio::net::TcpListener;
-use tokio_util::codec::Framed;
+use bytes::{Buf, BufMut, BytesMut};
 use std::io;
 use thiserror::Error;
 use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
-use futures::{SinkExt, StreamExt};
+
+pub mod server;
+pub mod client;
 
 #[derive(Debug, Clone)]
 pub enum Packet {
+    Connect(u16), // Client port
     Ping,
     Pong,
+    AskForTask,
+    GiveTask(Task),
+}
+
+#[derive(Debug, Clone)]
+pub enum Task {
+    None,
+    Map(String),
+    Reduce(String),
 }
 
 // Protocol-specific errors
@@ -84,6 +94,29 @@ impl Encoder<Packet> for CommandCodec {
             Packet::Pong => {
                 payload.put_u8(0x02);  // Message type: Pong
             }
+            Packet::Connect(port) => {
+                payload.put_u8(0x03);  // Message type: Connect
+                payload.put_u16(port);
+            }
+            Packet::AskForTask => {
+                payload.put_u8(0x04);  // Message type: AskForTask
+            }
+            Packet::GiveTask(task) => {
+                payload.put_u8(0x05);  // Message type: GiveTask
+                match task {
+                    Task::None => {
+                        payload.put_u8(0x00);
+                    }
+                    Task::Map(desc) => {
+                        payload.put_u8(0x01);
+                        payload.put_slice(desc.as_bytes());
+                    }
+                    Task::Reduce(desc) => {
+                        payload.put_u8(0x02);
+                        payload.put_slice(desc.as_bytes());
+                    }
+                }
+            }
         }
 
         // Write length-prefixed message
@@ -105,83 +138,14 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
     match msg_type {
         0x01 => Ok(Some(Packet::Ping)),
         0x02 => Ok(Some(Packet::Pong)),
+        0x03 => {
+            if payload.len() != 2 {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let port = u16::from_be_bytes([payload[0], payload[1]]);
+            Ok(Some(Packet::Connect(port)))
+        }
+        0x04 => Ok(Some(Packet::AskForTask)),
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }
-}
-
-async fn handle_packet(packet: Packet) -> Result<Option<Packet>, ProtocolError> {
-    match packet {
-        Packet::Ping => {
-            println!("Received Ping, sending Pong...");
-            Ok(Some(Packet::Pong))
-        }
-        Packet::Pong => {
-            println!("Received Pong");
-            // Handle Pong if needed
-            Ok(None)
-        }
-    }
-}
-
-pub async fn start_server(addr: &str) -> Result<(), ProtocolError> {
-    let listener = TcpListener::bind(addr).await?;
-
-    loop {
-        let (socket, addr) = listener.accept().await?;
-        tokio::spawn(async move {
-            println!("New connection from {}", addr);
-
-            // Wrap the socket with our codec
-            let mut framed = Framed::new(socket, CommandCodec);
-
-            while let Some(result) = framed.next().await {
-                let response = match result {
-                    Ok(cmd) => handle_packet(cmd).await,
-                    Err(e) => {
-                        eprintln!("Protocol error: {}", e);
-                        Err(e)
-                    }
-                };
-
-                if let Ok(Some(packet)) = response {
-                    if let Err(e) = framed.send(packet).await {
-                        eprintln!("Failed to send response: {}", e);
-                        break;
-                    }
-                }
-            }
-
-            println!("Connection from {} closed", addr);
-        });
-    }
-}
-
-pub async fn start_client(addr: &str, ping_count: usize) -> Result<(), ProtocolError> {
-    let stream = tokio::net::TcpStream::connect(addr).await?;
-    println!("Connected to {}", addr);
-
-    let mut framed = tokio_util::codec::Framed::new(stream, CommandCodec);
-
-    for i in 0..ping_count {
-        println!("Sending Ping #{}", i + 1);
-        framed.send(Packet::Ping).await?;
-
-        match framed.next().await {
-            Some(Ok(Packet::Pong)) => {
-                println!("Received Pong #{}", i + 1);
-            }
-            Some(Ok(Packet::Ping)) => {
-                eprintln!("Unexpected Ping from server");
-            }
-            Some(Err(e)) => {
-                return Err(e);
-            }
-            None => {
-                eprintln!("Server closed connection");
-                break;
-            }
-        }
-    }
-
-    Ok(())
 }

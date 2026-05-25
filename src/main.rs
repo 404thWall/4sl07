@@ -1,12 +1,9 @@
-pub mod management_protocole;
-
 use rustc_hash::FxHashMap;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
-
-use crate::Mode::{FileReader, Server}; // Faster than HashMap
+use slr07::management_protocole;
 
 static WORD_TO_TEST: &str = "the";
 
@@ -79,13 +76,13 @@ async fn main() {
     match server {
         Mode::Server => {
             println!("Starting in server mode...");
-            if let Err(e) = management_protocole::start_server("127.0.0.1:9000").await {
+            if let Err(e) = management_protocole::server::start_server("127.0.0.1:9000").await {
                 eprintln!("Server error: {}", e);
             }
         },
         Mode::Client => {
             println!("Starting in client mode...");
-            if let Err(e) = management_protocole::start_client("127.0.0.1:9000", 5).await {
+            if let Err(e) = management_protocole::client::start_client("127.0.0.1:9000", 5).await {
                 eprintln!("Client error: {}", e);
             }
         },
