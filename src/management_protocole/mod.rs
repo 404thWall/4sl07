@@ -146,6 +146,19 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
             Ok(Some(Packet::Connect(port)))
         }
         0x04 => Ok(Some(Packet::AskForTask)),
+        0x05 => {
+            if payload.is_empty() {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let task_type = payload[0];
+            let desc = String::from_utf8(payload[1..].to_vec()).map_err(|_| ProtocolError::InvalidUtf8)?;
+            match task_type {
+                0x00 => Ok(Some(Packet::GiveTask(Task::None))),
+                0x01 => Ok(Some(Packet::GiveTask(Task::Map(desc)))),
+                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(desc)))),
+                _ => Err(ProtocolError::InvalidMessageType(task_type)),
+            }
+        }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }
 }
