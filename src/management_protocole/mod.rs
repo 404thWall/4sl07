@@ -22,8 +22,8 @@ pub enum Packet {
 #[derive(Debug, Clone)]
 pub enum Task {
     None,
-    Map(String),
-    Reduce(String),
+    Map(u32),       // Contains the key
+    Reduce(u32),    // Contains the key
 }
 
 // Protocol-specific errors
@@ -106,14 +106,15 @@ impl Encoder<Packet> for CommandCodec {
                 match task {
                     Task::None => {
                         payload.put_u8(0x00);
+                        payload.put_u32(0);
                     }
-                    Task::Map(desc) => {
+                    Task::Map(key) => {
                         payload.put_u8(0x01);
-                        payload.put_slice(desc.as_bytes());
+                        payload.put_u32(key);
                     }
-                    Task::Reduce(desc) => {
+                    Task::Reduce(key) => {
                         payload.put_u8(0x02);
-                        payload.put_slice(desc.as_bytes());
+                        payload.put_u32(key);
                     }
                 }
             }
@@ -151,11 +152,14 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
             let task_type = payload[0];
-            let desc = String::from_utf8(payload[1..].to_vec()).map_err(|_| ProtocolError::InvalidUtf8)?;
+            if payload.len() < 5 {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
             match task_type {
                 0x00 => Ok(Some(Packet::GiveTask(Task::None))),
-                0x01 => Ok(Some(Packet::GiveTask(Task::Map(desc)))),
-                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(desc)))),
+                0x01 => Ok(Some(Packet::GiveTask(Task::Map(key)))),
+                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(key)))),
                 _ => Err(ProtocolError::InvalidMessageType(task_type)),
             }
         }
