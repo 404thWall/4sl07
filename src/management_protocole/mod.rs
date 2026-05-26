@@ -39,6 +39,10 @@ pub enum ProtocolError {
     InvalidUtf8,
     #[error("Message too large: {0} bytes")]
     MessageTooLarge(usize),
+    #[error("Unexpected packet: Should not receive {0:?} in this context")]
+    UnexpectedPacket(Packet),
+    #[error("Unexpected packet format: {0}")]
+    UnexpectedPacketFormat(String),
 }
 
 const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16 MB limit
@@ -141,11 +145,11 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         }
         0x04 => Ok(Some(Packet::AskForTask)),
         0x05 => {
-            let task = decode_task(payload, msg_type)?;
+            let task = decode_task(payload)?;
             Ok(Some(Packet::GiveTask(task)))
         }
         0x06 => {
-            let task = decode_task(payload, msg_type)?;
+            let task = decode_task(payload)?;
             Ok(Some(Packet::TaskFinished(task)))
         }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
@@ -177,13 +181,17 @@ fn encode_task(task: &Task, payload: &mut BytesMut) {
     }
 }
 
-fn decode_task(payload: &[u8], msg_type: u8) -> Result<Task, ProtocolError> {
+fn decode_task(payload: &[u8]) -> Result<Task, ProtocolError> {
     if payload.is_empty() {
-        return Err(ProtocolError::InvalidMessageType(msg_type));
+        return Err(ProtocolError::UnexpectedPacketFormat(
+            "Empty payload".to_string(),
+        ));
     }
     let task_type = payload[0];
     if payload.len() < 9 {
-        return Err(ProtocolError::InvalidMessageType(msg_type));
+        return Err(ProtocolError::UnexpectedPacketFormat(
+            "Payload too short".to_string(),
+        ));
     }
     let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
     let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
@@ -192,6 +200,9 @@ fn decode_task(payload: &[u8], msg_type: u8) -> Result<Task, ProtocolError> {
         0x01 => Ok(Task::Map(key, nkeys)),
         0x02 => Ok(Task::Reduce(key, nkeys)),
         0x03 => Ok(Task::Finished),
-        _ => Err(ProtocolError::InvalidMessageType(task_type)),
+        _ => Err(ProtocolError::UnexpectedPacketFormat(format!(
+            "Invalid task type: {}",
+            task_type
+        ))),
     }
 }

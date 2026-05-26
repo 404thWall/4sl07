@@ -54,17 +54,6 @@ fn client_handle_packet(
         }
         Packet::Pong => {
             println!("Received Pong");
-            // Nothing to do for client
-            Ok(None)
-        }
-        Packet::Connect(server_port) => {
-            println!("Received Connect with server port {}", server_port);
-            // Nothing to do for client
-            Ok(None)
-        }
-        Packet::AskForTask => {
-            println!("Received AskForTask");
-            // Nothing to do for client
             Ok(None)
         }
         Packet::GiveTask(task) => {
@@ -74,11 +63,7 @@ fn client_handle_packet(
             });
             Ok(None)
         }
-        Packet::TaskFinished(task) => {
-            println!("Received TaskFinished for task: {:?}", task);
-            // Nothing to do for client
-            Ok(None)
-        }
+        p => Err(ProtocolError::UnexpectedPacket(p)),
     }
 }
 

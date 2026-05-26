@@ -153,11 +153,6 @@ pub async fn server_handle_packet(
             println!("Assigning task {:?} to {}", task, addr);
             Ok(Some(Packet::GiveTask(task)))
         }
-        Packet::GiveTask(task) => {
-            println!("Received GiveTask from {} with task: {:?}", addr, task);
-            // Handle GiveTask if needed
-            Ok(None)
-        }
         Packet::TaskFinished(task) => {
             println!("Received TaskFinished from {} for task: {:?}", addr, task);
             match task {
@@ -197,6 +192,7 @@ pub async fn server_handle_packet(
             }
             Ok(None)
         }
+        _ => Ok(None),
     }
 }
 
