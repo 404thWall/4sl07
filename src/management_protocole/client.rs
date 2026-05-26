@@ -101,6 +101,7 @@ async fn do_task(task: Task, tx: tokio::sync::mpsc::Sender<Packet>) {
         }
         Task::Finished => {
             println!("All tasks are finished, client is done!");
+            std::process::exit(0);
         }
     }
 }
