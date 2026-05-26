@@ -1,4 +1,6 @@
-use crate::management_protocole::{Packet, CommandCodec, ProtocolError};
+use std::{default, time::Duration};
+
+use crate::management_protocole::{CommandCodec, Packet, ProtocolError, Task};
 use futures::{SinkExt, StreamExt};
 
 pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
@@ -19,12 +21,13 @@ pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
         }
     });
 
-    tx.send(Packet::Ping).await.ok();
+    tx.send(Packet::Connect(25565u16)).await.ok();
+    tx.send(Packet::AskForTask).await.ok();
 
     while let Some(incoming) = receiver.next().await {
         match incoming {
             Ok(packet) => {
-                if let Some(response) = client_handle_packet(packet)? {
+                if let Some(response) = client_handle_packet(packet, tx.clone())? {
                     tx.send(response).await.ok();
                 }
             }
@@ -40,7 +43,10 @@ pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
     Ok(())
 }
 
-fn client_handle_packet(packet: Packet) -> Result<Option<Packet>, ProtocolError> {
+fn client_handle_packet(
+    packet: Packet,
+    tx: tokio::sync::mpsc::Sender<Packet>,
+) -> Result<Option<Packet>, ProtocolError> {
     match packet {
         Packet::Ping => {
             println!("Received Ping, sending Pong...");
@@ -48,23 +54,48 @@ fn client_handle_packet(packet: Packet) -> Result<Option<Packet>, ProtocolError>
         }
         Packet::Pong => {
             println!("Received Pong");
-            // Handle Pong if needed
+            // Nothing to do for client
             Ok(None)
         }
         Packet::Connect(server_port) => {
             println!("Received Connect with server port {}", server_port);
-            // Handle Connect if needed
+            // Nothing to do for client
             Ok(None)
         }
         Packet::AskForTask => {
             println!("Received AskForTask");
-            // Handle AskForTask if needed
+            // Nothing to do for client
             Ok(None)
         }
         Packet::GiveTask(task) => {
             println!("Received GiveTask with task: {:?}", task);
-            // Handle GiveTask if needed
+            tokio::spawn(async move {
+                do_task(task, tx.clone()).await;
+            });
             Ok(None)
+        }
+        Packet::TaskFinished(task) => {
+            println!("Received TaskFinished for task: {:?}", task);
+            // Nothing to do for client
+            Ok(None)
+        }
+    }
+}
+
+async fn do_task(task: Task, tx: tokio::sync::mpsc::Sender<Packet>) {
+    match task {
+        Task::Map(key, nkeys) => {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            tx.send(Packet::TaskFinished(task)).await.ok();
+            tx.send(Packet::AskForTask).await.ok();
+        }
+        Task::Reduce(key, nkeys) => {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            tx.send(Packet::TaskFinished(task)).await.ok();
+            tx.send(Packet::AskForTask).await.ok();
+        }
+        _ => {
+            println!("Nothing to do for now");
         }
     }
 }

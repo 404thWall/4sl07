@@ -7,8 +7,8 @@ use thiserror::Error;
 use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
 
-pub mod server;
 pub mod client;
+pub mod server;
 
 #[derive(Debug, Clone)]
 pub enum Packet {
@@ -17,13 +17,14 @@ pub enum Packet {
     Pong,
     AskForTask,
     GiveTask(Task),
+    TaskFinished(Task),
 }
 
 #[derive(Debug, Clone)]
 pub enum Task {
     None,
-    Map(u32),       // Contains the key
-    Reduce(u32),    // Contains the key
+    Map(u32, u32),    // Contains the key and the number of keys for this task
+    Reduce(u32, u32), // Contains the key and the number of keys for this task
 }
 
 // Protocol-specific errors
@@ -89,32 +90,55 @@ impl Encoder<Packet> for CommandCodec {
 
         match item {
             Packet::Ping => {
-                payload.put_u8(0x01);  // Message type: Ping
+                payload.put_u8(0x01); // Message type: Ping
             }
             Packet::Pong => {
-                payload.put_u8(0x02);  // Message type: Pong
+                payload.put_u8(0x02); // Message type: Pong
             }
             Packet::Connect(port) => {
-                payload.put_u8(0x03);  // Message type: Connect
+                payload.put_u8(0x03); // Message type: Connect
                 payload.put_u16(port);
             }
             Packet::AskForTask => {
-                payload.put_u8(0x04);  // Message type: AskForTask
+                payload.put_u8(0x04); // Message type: AskForTask
             }
             Packet::GiveTask(task) => {
-                payload.put_u8(0x05);  // Message type: GiveTask
+                payload.put_u8(0x05); // Message type: GiveTask
                 match task {
                     Task::None => {
                         payload.put_u8(0x00);
                         payload.put_u32(0);
+                        payload.put_u32(0);
                     }
-                    Task::Map(key) => {
+                    Task::Map(key, nkeys) => {
                         payload.put_u8(0x01);
                         payload.put_u32(key);
+                        payload.put_u32(nkeys);
                     }
-                    Task::Reduce(key) => {
+                    Task::Reduce(key, nkeys) => {
                         payload.put_u8(0x02);
                         payload.put_u32(key);
+                        payload.put_u32(nkeys);
+                    }
+                }
+            }
+            Packet::TaskFinished(task) => {
+                payload.put_u8(0x06); // Message type: TaskFinished
+                match task {
+                    Task::None => {
+                        payload.put_u8(0x00);
+                        payload.put_u32(0);
+                        payload.put_u32(0);
+                    }
+                    Task::Map(key, nkeys) => {
+                        payload.put_u8(0x01);
+                        payload.put_u32(key);
+                        payload.put_u32(nkeys);
+                    }
+                    Task::Reduce(key, nkeys) => {
+                        payload.put_u8(0x02);
+                        payload.put_u32(key);
+                        payload.put_u32(nkeys);
                     }
                 }
             }
@@ -152,14 +176,32 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
             let task_type = payload[0];
-            if payload.len() < 5 {
+            if payload.len() < 9 {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
             let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
+            let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
             match task_type {
                 0x00 => Ok(Some(Packet::GiveTask(Task::None))),
-                0x01 => Ok(Some(Packet::GiveTask(Task::Map(key)))),
-                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(key)))),
+                0x01 => Ok(Some(Packet::GiveTask(Task::Map(key, nkeys)))),
+                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(key, nkeys)))),
+                _ => Err(ProtocolError::InvalidMessageType(task_type)),
+            }
+        }
+        0x06 => {
+            if payload.is_empty() {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let task_type = payload[0];
+            if payload.len() < 9 {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
+            let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
+            match task_type {
+                0x00 => Ok(Some(Packet::TaskFinished(Task::None))),
+                0x01 => Ok(Some(Packet::TaskFinished(Task::Map(key, nkeys)))),
+                0x02 => Ok(Some(Packet::TaskFinished(Task::Reduce(key, nkeys)))),
                 _ => Err(ProtocolError::InvalidMessageType(task_type)),
             }
         }
