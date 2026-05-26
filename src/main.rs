@@ -1,6 +1,7 @@
 use management_protocole::main_protocole::main_client::MainClient;
 use rustc_hash::FxHashMap;
 use slr07::management_protocole;
+use slr07::management_protocole::main_protocole::main_server::MainServer;
 use std::env;
 use std::time::Instant;
 pub mod map;
@@ -35,7 +36,10 @@ async fn main() {
     match server {
         Mode::Server => {
             println!("Starting in server mode...");
-            if let Err(e) = management_protocole::server::start_server("127.0.0.1:9000").await {
+            if let Err(e) =
+                management_protocole::server::start_server("127.0.0.1:9000", MainServer::new())
+                    .await
+            {
                 eprintln!("Server error: {}", e);
             }
         }
