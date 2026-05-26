@@ -163,11 +163,11 @@ pub async fn server_handle_packet(
                         println!("Marking Task Map {} as finished", key);
                         tuple.0[key as usize] = true;
                         tuple.1 += 1;
-                    }
 
-                    if tuple.1 == MAP_TASKS_AMOUNT as u32 {
-                        println!("All Map tasks finished, generating Reduce tasks...");
-                        generate_reduce_tasks().await;
+                        if tuple.1 == MAP_TASKS_AMOUNT as u32 {
+                            println!("All Map tasks finished, generating Reduce tasks...");
+                            generate_reduce_tasks().await;
+                        }
                     }
                 }
                 Task::Reduce(key, _) => {
