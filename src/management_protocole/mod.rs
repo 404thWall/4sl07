@@ -8,6 +8,7 @@ use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
 
 pub mod client;
+pub mod main_protocole;
 pub mod server;
 
 #[derive(Debug, Clone)]

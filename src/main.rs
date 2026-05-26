@@ -1,3 +1,5 @@
+use management_protocole::main_protocole::MainClient;
+use rustc_hash::FxHashMap;
 use slr07::management_protocole;
 use std::env;
 use std::time::Instant;
@@ -39,7 +41,10 @@ async fn main() {
         }
         Mode::Client => {
             println!("Starting in client mode...");
-            if let Err(e) = management_protocole::client::start_client("127.0.0.1:9000").await {
+            if let Err(e) =
+                management_protocole::client::start_client("127.0.0.1:9000", MainClient::new())
+                    .await
+            {
                 eprintln!("Client error: {}", e);
             }
         }

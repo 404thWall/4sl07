@@ -1,10 +1,26 @@
-use std::time::Duration;
-
-use crate::management_protocole::{CommandCodec, Packet, ProtocolError, Task};
+use crate::management_protocole::{CommandCodec, Packet, ProtocolError};
 use futures::{SinkExt, StreamExt};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc::Sender;
 
-pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
-    let stream = tokio::net::TcpStream::connect(addr).await?;
+pub trait ClientHandler {
+    fn on_connection_established(
+        &mut self,
+        tx: Sender<Packet>,
+    ) -> impl Future<Output = Result<(), ProtocolError>>;
+    fn handle_packet(
+        &mut self,
+        packet: Packet,
+        tx: Sender<Packet>,
+    ) -> Result<Option<Packet>, ProtocolError>;
+    fn on_connection_ended(
+        &mut self,
+        tx: Sender<Packet>,
+    ) -> impl Future<Output = Result<(), ProtocolError>>;
+}
+
+pub async fn start_client(addr: &str, mut client: impl ClientHandler) -> Result<(), ProtocolError> {
+    let stream: TcpStream = TcpStream::connect(addr).await?;
     println!("Connected to {}", addr);
 
     let mut framed = tokio_util::codec::Framed::new(stream, CommandCodec);
@@ -21,13 +37,12 @@ pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
         }
     });
 
-    tx.send(Packet::Connect(25565u16)).await.ok();
-    tx.send(Packet::AskForTask).await.ok();
+    client.on_connection_established(tx.clone()).await.ok();
 
     while let Some(incoming) = receiver.next().await {
         match incoming {
             Ok(packet) => {
-                if let Some(response) = client_handle_packet(packet, tx.clone())? {
+                if let Some(response) = client.handle_packet(packet, tx.clone())? {
                     tx.send(response).await.ok();
                 }
             }
@@ -37,56 +52,9 @@ pub async fn start_client(addr: &str) -> Result<(), ProtocolError> {
         }
     }
 
+    client.on_connection_ended(tx.clone()).await.ok();
     drop(tx);
     let _ = writer_task.await;
 
     Ok(())
-}
-
-fn client_handle_packet(
-    packet: Packet,
-    tx: tokio::sync::mpsc::Sender<Packet>,
-) -> Result<Option<Packet>, ProtocolError> {
-    match packet {
-        Packet::Ping => {
-            println!("Received Ping, sending Pong...");
-            Ok(Some(Packet::Pong))
-        }
-        Packet::Pong => {
-            println!("Received Pong");
-            Ok(None)
-        }
-        Packet::GiveTask(task) => {
-            println!("Received GiveTask with task: {:?}", task);
-            tokio::spawn(async move {
-                do_task(task, tx.clone()).await;
-            });
-            Ok(None)
-        }
-        p => Err(ProtocolError::UnexpectedPacket(p)),
-    }
-}
-
-async fn do_task(task: Task, tx: tokio::sync::mpsc::Sender<Packet>) {
-    match task {
-        Task::Map(_key, _nkeys) => {
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            tx.send(Packet::TaskFinished(task)).await.ok();
-            tx.send(Packet::AskForTask).await.ok();
-        }
-        Task::Reduce(_key, _nkeys) => {
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            tx.send(Packet::TaskFinished(task)).await.ok();
-            tx.send(Packet::AskForTask).await.ok();
-        }
-        Task::None => {
-            println!("Nothing to do for now, launching a new AskForTask after 1s...");
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            tx.send(Packet::AskForTask).await.ok();
-        }
-        Task::Finished => {
-            println!("All tasks are finished, client is done!");
-            std::process::exit(0);
-        }
-    }
 }
