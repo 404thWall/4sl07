@@ -1,9 +1,9 @@
 use rustc_hash::FxHashMap;
+use slr07::management_protocole;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
-use slr07::management_protocole;
 
 static WORD_TO_TEST: &str = "the";
 
@@ -79,13 +79,13 @@ async fn main() {
             if let Err(e) = management_protocole::server::start_server("127.0.0.1:9000").await {
                 eprintln!("Server error: {}", e);
             }
-        },
+        }
         Mode::Client => {
             println!("Starting in client mode...");
             if let Err(e) = management_protocole::client::start_client("127.0.0.1:9000").await {
                 eprintln!("Client error: {}", e);
             }
-        },
+        }
         Mode::FileReader => {
             println!("Starting in file reader mode...");
             let start = Instant::now();
@@ -96,6 +96,6 @@ async fn main() {
                 "Program finished! It took {:}s to run.",
                 start.elapsed().as_secs_f64()
             );
-        },
+        }
     }
 }
