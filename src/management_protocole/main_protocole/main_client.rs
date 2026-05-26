@@ -5,7 +5,6 @@ use crate::management_protocole::{Packet, ProtocolError, Task};
 use tokio::sync::mpsc::Sender;
 
 pub struct MainClient;
-pub struct MainServer;
 
 impl MainClient {
     pub fn new() -> Self {
@@ -20,10 +19,7 @@ impl Default for MainClient {
 }
 
 impl ClientHandler for MainClient {
-    async fn on_connection_established(
-        &mut self,
-        tx: tokio::sync::mpsc::Sender<super::Packet>,
-    ) -> Result<(), super::ProtocolError> {
+    async fn on_connection_established(&mut self, tx: Sender<Packet>) -> Result<(), ProtocolError> {
         tx.send(Packet::Connect(25565u16)).await.ok();
         tx.send(Packet::AskForTask).await.ok();
         Ok(())
@@ -31,9 +27,9 @@ impl ClientHandler for MainClient {
 
     fn handle_packet(
         &mut self,
-        packet: super::Packet,
-        tx: tokio::sync::mpsc::Sender<super::Packet>,
-    ) -> Result<Option<super::Packet>, super::ProtocolError> {
+        packet: Packet,
+        tx: Sender<Packet>,
+    ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
             Packet::Ping => {
                 println!("Received Ping, sending Pong...");
@@ -54,10 +50,7 @@ impl ClientHandler for MainClient {
         }
     }
 
-    async fn on_connection_ended(
-        &mut self,
-        _tx: Sender<super::Packet>,
-    ) -> Result<(), super::ProtocolError> {
+    async fn on_connection_ended(&mut self, _tx: Sender<Packet>) -> Result<(), ProtocolError> {
         Ok(())
     }
 }

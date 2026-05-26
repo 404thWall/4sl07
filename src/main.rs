@@ -1,4 +1,4 @@
-use management_protocole::main_protocole::MainClient;
+use management_protocole::main_protocole::main_client::MainClient;
 use rustc_hash::FxHashMap;
 use slr07::management_protocole;
 use std::env;
