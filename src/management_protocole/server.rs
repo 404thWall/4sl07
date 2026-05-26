@@ -142,7 +142,7 @@ pub async fn server_handle_packet(
             println!("Received AskForTask from {}", addr);
             let mut queue = TASK_QUEUE.write().await;
             if queue.is_empty() {
-                if REDUCE_TASKS_FINISHED.read().await .1 == REDUCE_TASKS_AMOUNT as u32 {
+                if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
                     println!("All tasks are finished, sending None to {}", addr);
                     return Ok(Some(Packet::GiveTask(Task::Finished)));
                 }
@@ -179,7 +179,10 @@ pub async fn server_handle_packet(
                 Task::Reduce(key, _) => {
                     let mut tuple = REDUCE_TASKS_FINISHED.write().await; // (vec, count)
                     if tuple.0[key as usize] {
-                        println!("Task Reduce {} was already marked as finished, ignoring", key);
+                        println!(
+                            "Task Reduce {} was already marked as finished, ignoring",
+                            key
+                        );
                     } else {
                         println!("Marking Task Reduce {} as finished", key);
                         tuple.0[key as usize] = true;
