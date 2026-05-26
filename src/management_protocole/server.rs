@@ -16,6 +16,8 @@ static LAST_RECEIVED_PING: LazyLock<RwLock<HashMap<String, u32>>> =
 static TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
 static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![false; MAP_TASKS_AMOUNT], 0)));
+static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
+    LazyLock::new(|| RwLock::new((vec![false; REDUCE_TASKS_AMOUNT], 0)));
 
 enum OutMsg {
     MsgPacket(Packet),
@@ -140,6 +142,10 @@ pub async fn server_handle_packet(
             println!("Received AskForTask from {}", addr);
             let mut queue = TASK_QUEUE.write().await;
             if queue.is_empty() {
+                if REDUCE_TASKS_FINISHED.read().await .1 == REDUCE_TASKS_AMOUNT as u32 {
+                    println!("All tasks are finished, sending None to {}", addr);
+                    return Ok(Some(Packet::GiveTask(Task::Finished)));
+                }
                 println!("No more tasks available for {}, sending None", addr);
                 return Ok(Some(Packet::GiveTask(Task::None)));
             }
@@ -171,8 +177,18 @@ pub async fn server_handle_packet(
                     }
                 }
                 Task::Reduce(key, _) => {
-                    println!("Task Reduce {} finished", key);
-                    // TODO Track finished Reduce tasks
+                    let mut tuple = REDUCE_TASKS_FINISHED.write().await; // (vec, count)
+                    if tuple.0[key as usize] {
+                        println!("Task Reduce {} was already marked as finished, ignoring", key);
+                    } else {
+                        println!("Marking Task Reduce {} as finished", key);
+                        tuple.0[key as usize] = true;
+                        tuple.1 += 1;
+
+                        if tuple.1 == REDUCE_TASKS_AMOUNT as u32 {
+                            println!("All Reduce tasks finished");
+                        }
+                    }
                 }
                 _ => {}
             }

@@ -94,8 +94,13 @@ async fn do_task(task: Task, tx: tokio::sync::mpsc::Sender<Packet>) {
             tx.send(Packet::TaskFinished(task)).await.ok();
             tx.send(Packet::AskForTask).await.ok();
         }
-        _ => {
-            println!("Nothing to do for now");
+        Task::None => {
+            println!("Nothing to do for now, launching a new AskForTask after 1s...");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            tx.send(Packet::AskForTask).await.ok();
+        }
+        Task::Finished => {
+            println!("All tasks are finished, client is done!");
         }
     }
 }

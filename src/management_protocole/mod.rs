@@ -23,6 +23,7 @@ pub enum Packet {
 #[derive(Debug, Clone)]
 pub enum Task {
     None,
+    Finished,
     Map(u32, u32),    // Contains the key and the number of keys for this task
     Reduce(u32, u32), // Contains the key and the number of keys for this task
 }
@@ -120,6 +121,11 @@ impl Encoder<Packet> for CommandCodec {
                         payload.put_u32(key);
                         payload.put_u32(nkeys);
                     }
+                    Task::Finished => {
+                        payload.put_u8(0x03);
+                        payload.put_u32(0);
+                        payload.put_u32(0);
+                    }
                 }
             }
             Packet::TaskFinished(task) => {
@@ -139,6 +145,11 @@ impl Encoder<Packet> for CommandCodec {
                         payload.put_u8(0x02);
                         payload.put_u32(key);
                         payload.put_u32(nkeys);
+                    }
+                    Task::Finished => {
+                        payload.put_u8(0x03);
+                        payload.put_u32(0);
+                        payload.put_u32(0);
                     }
                 }
             }
@@ -185,6 +196,7 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 0x00 => Ok(Some(Packet::GiveTask(Task::None))),
                 0x01 => Ok(Some(Packet::GiveTask(Task::Map(key, nkeys)))),
                 0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(key, nkeys)))),
+                0x03 => Ok(Some(Packet::GiveTask(Task::Finished))),
                 _ => Err(ProtocolError::InvalidMessageType(task_type)),
             }
         }
@@ -202,6 +214,7 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 0x00 => Ok(Some(Packet::TaskFinished(Task::None))),
                 0x01 => Ok(Some(Packet::TaskFinished(Task::Map(key, nkeys)))),
                 0x02 => Ok(Some(Packet::TaskFinished(Task::Reduce(key, nkeys)))),
+                0x03 => Ok(Some(Packet::TaskFinished(Task::Finished))),
                 _ => Err(ProtocolError::InvalidMessageType(task_type)),
             }
         }
