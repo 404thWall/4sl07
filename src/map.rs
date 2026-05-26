@@ -1,32 +1,34 @@
 use rustc_hash::FxHashMap; //Faster than base HashMap
-use std::fs::{File, read};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 
 static WORD_TO_TEST: &str = "the";
-//static MAX_CHUNK_NUMBER :usize = 5;
 
-pub fn run(path : &str) -> std::io::Result<()> {
+pub fn run(path: &str) -> std::io::Result<()> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
-    //let mut current_chunk = 0;
 
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
 
+    // Parsing buffers :
+    let mut line = String::new();
+    let mut chunk_bytes: Vec<u8> = Vec::with_capacity(5000);
+
     loop {
-        let mut line = String::new();
+        line.clear();
         // Reading the lines
         // If zero bytes are read, we hit EOF
         if reader.read_line(&mut line)? == 0 {
-            break; 
+            break;
         }
         //Else we start a new chunk of data
-        
-        //First line should be a version type. We can ignore it.
-        //println!("{current_chunk} : Should be 'WARC/1.0\\r\\n' : {line:?}");
+
+        //First line should be a version type. We can ignore it. Though let's check if it is just in case :
+        assert_eq!(line, "WARC/1.0\r\n");
         let content_length;
-        //We need to find the size of the chunk : 
+        //We need to find the size of the chunk :
         loop {
-            let mut line = String::new();
+            line.clear();
             reader.read_line(&mut line)?;
             let trimmed_line = line.trim();
 
@@ -41,28 +43,15 @@ pub fn run(path : &str) -> std::io::Result<()> {
         }
 
         //There are 2 additionnal bytes between header and body : \r and \n
-        //We discard them :
-        let mut buf = vec![0; 2];
-        reader.read_exact(&mut buf).unwrap();
+        //There are 4 additionnal bytes between body and next header : \r and \n repeated twice
+        //We can simply discard them
+        //We also now know the size of data to read, which gives :
+        chunk_bytes.resize(content_length + 6, 0);
+        reader.read_exact(&mut chunk_bytes[..content_length+6]).unwrap();
 
-        // We now know the size of data to read : 
-        let mut chunk_bytes = vec![0; content_length];
-        reader.read_exact(&mut chunk_bytes).unwrap();
-        //println!("Chunk of data :\n{:?}\n", chunk_bytes);
-        //println!("Readable : \n{:?}", str::from_utf8_mut(&mut chunk_bytes).unwrap());
-        let contents: &mut str = str::from_utf8_mut(&mut chunk_bytes).unwrap();
+        let contents: &mut str =
+            str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
         split_single_chunk(contents, &mut map).unwrap();
-        
-        //if MAX_CHUNK_NUMBER == current_chunk {
-        //    return Ok(())
-        //}
-        //current_chunk +=1;
-
-        //There are 4 additionnal bytes between header and body : \r and \n repeated twice
-        //We discard them :
-        let mut buf = vec![0; 4];
-        reader.read_exact(&mut buf).unwrap();
-
     }
 
     if let Some(count) = map.get(WORD_TO_TEST) {
@@ -99,8 +88,12 @@ pub fn split_single_chunk(
         if word.is_empty() {
             continue;
         }
-        map.entry(word.to_owned()).and_modify(|count| *count += 1).or_insert(1);
+        if let Some(count) = map.get_mut(word) {
+            *count += 1;
+        } else {
+            map.insert(word.to_string(), 1);
+        }
     }
-    
+
     Ok(())
 }
