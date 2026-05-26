@@ -1,4 +1,4 @@
-use std::{default, time::Duration};
+use std::time::Duration;
 
 use crate::management_protocole::{CommandCodec, Packet, ProtocolError, Task};
 use futures::{SinkExt, StreamExt};
@@ -84,12 +84,12 @@ fn client_handle_packet(
 
 async fn do_task(task: Task, tx: tokio::sync::mpsc::Sender<Packet>) {
     match task {
-        Task::Map(key, nkeys) => {
+        Task::Map(_key, _nkeys) => {
             tokio::time::sleep(Duration::from_secs(2)).await;
             tx.send(Packet::TaskFinished(task)).await.ok();
             tx.send(Packet::AskForTask).await.ok();
         }
-        Task::Reduce(key, nkeys) => {
+        Task::Reduce(_key, _nkeys) => {
             tokio::time::sleep(Duration::from_secs(3)).await;
             tx.send(Packet::TaskFinished(task)).await.ok();
             tx.send(Packet::AskForTask).await.ok();

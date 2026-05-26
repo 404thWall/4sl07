@@ -71,11 +71,11 @@ pub async fn start_server(addr: &str) -> Result<(), ProtocolError> {
                     }
                 };
 
-                if let Ok(Some(packet)) = response {
-                    if let Err(e) = send_back_tx.send(OutMsg::MsgPacket(packet)).await {
-                        eprintln!("Failed to send response: {}", e);
-                        break;
-                    }
+                if let Ok(Some(packet)) = response
+                    && let Err(e) = send_back_tx.send(OutMsg::MsgPacket(packet)).await
+                {
+                    eprintln!("Failed to send response: {}", e);
+                    break;
                 }
             }
 
@@ -169,6 +169,10 @@ pub async fn server_handle_packet(
                         println!("All Map tasks finished, generating Reduce tasks...");
                         generate_reduce_tasks().await;
                     }
+                }
+                Task::Reduce(key, _) => {
+                    println!("Task Reduce {} finished", key);
+                    // TODO Track finished Reduce tasks
                 }
                 _ => {}
             }
