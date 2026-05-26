@@ -1,63 +1,13 @@
-use rustc_hash::FxHashMap;
 use slr07::management_protocole;
 use std::env;
-use std::fs::File;
-use std::io::Read;
 use std::time::Instant;
-
-static WORD_TO_TEST: &str = "the";
+pub mod map;
+use map::run;
 
 enum Mode {
     Server,
     Client,
     FileReader,
-}
-
-fn run() -> std::io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let path = if args.len() < 2 {
-        "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
-    } else if args.len() == 2 {
-        &args[1]
-    } else {
-        panic!("Too many args.")
-    };
-
-    let mut map: FxHashMap<&str, u32> = FxHashMap::default();
-
-    let mut file = File::open(path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    contents.make_ascii_lowercase();
-
-    let words = contents.split(|c: char| {
-        c == ' '
-            || c == '\n'
-            || c == '\r'
-            || c == '.'
-            || c == ','
-            || c == '?'
-            || c == ':'
-            || c == '!'
-            || c == '('
-            || c == ')'
-            || c == ';'
-    });
-
-    for word in words {
-        if word.is_empty() {
-            continue;
-        }
-        map.entry(word).and_modify(|count| *count += 1).or_insert(1);
-    }
-
-    if let Some(count) = map.get(WORD_TO_TEST) {
-        println!(
-            "As an example, the word '{WORD_TO_TEST}' was present {} times",
-            count
-        );
-    }
-    Ok(())
 }
 
 #[tokio::main]
@@ -72,6 +22,13 @@ async fn main() {
             server = Mode::Client;
         }
     }
+    let path = if args.len() < 2 {
+        "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
+    } else if args.len() == 2 {
+        &args[1]
+    } else {
+        panic!("Too many args.")
+    };
 
     match server {
         Mode::Server => {
@@ -89,7 +46,7 @@ async fn main() {
         Mode::FileReader => {
             println!("Starting in file reader mode...");
             let start = Instant::now();
-            if let Err(e) = run() {
+            if let Err(e) = run(path) {
                 eprintln!("Error: {}", e);
             }
             println!(
