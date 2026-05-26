@@ -105,53 +105,11 @@ impl Encoder<Packet> for CommandCodec {
             }
             Packet::GiveTask(task) => {
                 payload.put_u8(0x05); // Message type: GiveTask
-                match task {
-                    Task::None => {
-                        payload.put_u8(0x00);
-                        payload.put_u32(0);
-                        payload.put_u32(0);
-                    }
-                    Task::Map(key, nkeys) => {
-                        payload.put_u8(0x01);
-                        payload.put_u32(key);
-                        payload.put_u32(nkeys);
-                    }
-                    Task::Reduce(key, nkeys) => {
-                        payload.put_u8(0x02);
-                        payload.put_u32(key);
-                        payload.put_u32(nkeys);
-                    }
-                    Task::Finished => {
-                        payload.put_u8(0x03);
-                        payload.put_u32(0);
-                        payload.put_u32(0);
-                    }
-                }
+                encode_task(&task, &mut payload);
             }
             Packet::TaskFinished(task) => {
                 payload.put_u8(0x06); // Message type: TaskFinished
-                match task {
-                    Task::None => {
-                        payload.put_u8(0x00);
-                        payload.put_u32(0);
-                        payload.put_u32(0);
-                    }
-                    Task::Map(key, nkeys) => {
-                        payload.put_u8(0x01);
-                        payload.put_u32(key);
-                        payload.put_u32(nkeys);
-                    }
-                    Task::Reduce(key, nkeys) => {
-                        payload.put_u8(0x02);
-                        payload.put_u32(key);
-                        payload.put_u32(nkeys);
-                    }
-                    Task::Finished => {
-                        payload.put_u8(0x03);
-                        payload.put_u32(0);
-                        payload.put_u32(0);
-                    }
-                }
+                encode_task(&task, &mut payload);
             }
         }
 
@@ -183,41 +141,57 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         }
         0x04 => Ok(Some(Packet::AskForTask)),
         0x05 => {
-            if payload.is_empty() {
-                return Err(ProtocolError::InvalidMessageType(msg_type));
-            }
-            let task_type = payload[0];
-            if payload.len() < 9 {
-                return Err(ProtocolError::InvalidMessageType(msg_type));
-            }
-            let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
-            let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
-            match task_type {
-                0x00 => Ok(Some(Packet::GiveTask(Task::None))),
-                0x01 => Ok(Some(Packet::GiveTask(Task::Map(key, nkeys)))),
-                0x02 => Ok(Some(Packet::GiveTask(Task::Reduce(key, nkeys)))),
-                0x03 => Ok(Some(Packet::GiveTask(Task::Finished))),
-                _ => Err(ProtocolError::InvalidMessageType(task_type)),
-            }
+            let task = decode_task(payload, msg_type)?;
+            Ok(Some(Packet::GiveTask(task)))
         }
         0x06 => {
-            if payload.is_empty() {
-                return Err(ProtocolError::InvalidMessageType(msg_type));
-            }
-            let task_type = payload[0];
-            if payload.len() < 9 {
-                return Err(ProtocolError::InvalidMessageType(msg_type));
-            }
-            let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
-            let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
-            match task_type {
-                0x00 => Ok(Some(Packet::TaskFinished(Task::None))),
-                0x01 => Ok(Some(Packet::TaskFinished(Task::Map(key, nkeys)))),
-                0x02 => Ok(Some(Packet::TaskFinished(Task::Reduce(key, nkeys)))),
-                0x03 => Ok(Some(Packet::TaskFinished(Task::Finished))),
-                _ => Err(ProtocolError::InvalidMessageType(task_type)),
-            }
+            let task = decode_task(payload, msg_type)?;
+            Ok(Some(Packet::TaskFinished(task)))
         }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
+    }
+}
+
+fn encode_task(task: &Task, payload: &mut BytesMut) {
+    match task {
+        Task::None => {
+            payload.put_u8(0x00);
+            payload.put_u32(0);
+            payload.put_u32(0);
+        }
+        Task::Map(key, nkeys) => {
+            payload.put_u8(0x01);
+            payload.put_u32(*key);
+            payload.put_u32(*nkeys);
+        }
+        Task::Reduce(key, nkeys) => {
+            payload.put_u8(0x02);
+            payload.put_u32(*key);
+            payload.put_u32(*nkeys);
+        }
+        Task::Finished => {
+            payload.put_u8(0x03);
+            payload.put_u32(0);
+            payload.put_u32(0);
+        }
+    }
+}
+
+fn decode_task(payload: &[u8], msg_type: u8) -> Result<Task, ProtocolError> {
+    if payload.is_empty() {
+        return Err(ProtocolError::InvalidMessageType(msg_type));
+    }
+    let task_type = payload[0];
+    if payload.len() < 9 {
+        return Err(ProtocolError::InvalidMessageType(msg_type));
+    }
+    let key = u32::from_be_bytes([payload[1], payload[2], payload[3], payload[4]]);
+    let nkeys = u32::from_be_bytes([payload[5], payload[6], payload[7], payload[8]]);
+    match task_type {
+        0x00 => Ok(Task::None),
+        0x01 => Ok(Task::Map(key, nkeys)),
+        0x02 => Ok(Task::Reduce(key, nkeys)),
+        0x03 => Ok(Task::Finished),
+        _ => Err(ProtocolError::InvalidMessageType(task_type)),
     }
 }
