@@ -68,6 +68,7 @@ impl ClientHandler for FileClient {
                         "Total time taken: {:.2?}",
                         self.begin_time.unwrap().elapsed()
                     );
+                    return Err(ProtocolError::ClosingConnection);
                 }
                 
                 Ok(None)
