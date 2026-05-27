@@ -47,7 +47,9 @@ pub fn run(path: &str) -> std::io::Result<()> {
         //We can simply discard them
         //We also now know the size of data to read, which gives :
         chunk_bytes.resize(content_length + 6, 0);
-        reader.read_exact(&mut chunk_bytes[..content_length+6]).unwrap();
+        reader
+            .read_exact(&mut chunk_bytes[..content_length + 6])
+            .unwrap();
 
         let contents: &mut str =
             str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
