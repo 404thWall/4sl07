@@ -8,6 +8,7 @@ use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
 
 pub mod client;
+pub mod file_transfer_protocole;
 pub mod main_protocole;
 pub mod server;
 
@@ -19,6 +20,12 @@ pub enum Packet {
     AskForTask,
     GiveTask(Task),
     TaskFinished(Task),
+    AskMapResultFile(u64), // Contains the current offset in the file
+    MapResultFile {
+        end_offset: u64,  // The offset in the file after the content sent in this packet
+        file_size: u64,   // Total size of the file in bytes
+        content: Vec<u8>, // Contains the content of the file as bytes
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +123,20 @@ impl Encoder<Packet> for CommandCodec {
                 payload.put_u8(0x06); // Message type: TaskFinished
                 encode_task(&task, &mut payload);
             }
+            Packet::AskMapResultFile(offset) => {
+                payload.put_u8(0x07); // Message type: AskMapResultFile
+                payload.put_u64(offset);
+            }
+            Packet::MapResultFile {
+                end_offset,
+                file_size,
+                content,
+            } => {
+                payload.put_u8(0x08); // Message type: MapResultFile
+                payload.put_u64(end_offset);
+                payload.put_u64(file_size);
+                payload.put_slice(&content);
+            }
         }
 
         // Write length-prefixed message
@@ -152,6 +173,49 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         0x06 => {
             let task = decode_task(payload)?;
             Ok(Some(Packet::TaskFinished(task)))
+        }
+        0x07 => {
+            if payload.len() != 8 {
+                return Err(ProtocolError::UnexpectedPacketFormat(
+                    "Payload too short for AskMapResultFile".to_string(),
+                ));
+            }
+            let offset = u64::from_be_bytes([
+                payload[0], payload[1], payload[2], payload[3], payload[4], payload[5], payload[6],
+                payload[7],
+            ]);
+            Ok(Some(Packet::AskMapResultFile(offset)))
+        }
+        0x08 => {
+            if payload.len() < 16 {
+                return Err(ProtocolError::UnexpectedPacketFormat(
+                    "Payload too short for MapResultFile".to_string(),
+                ));
+            }
+
+            let end_offset = u64::from_be_bytes([
+                payload[0], payload[1], payload[2], payload[3], payload[4], payload[5], payload[6],
+                payload[7],
+            ]);
+
+            let file_size = u64::from_be_bytes([
+                payload[8],
+                payload[9],
+                payload[10],
+                payload[11],
+                payload[12],
+                payload[13],
+                payload[14],
+                payload[15],
+            ]);
+
+            let content = payload[16..].to_vec();
+
+            Ok(Some(Packet::MapResultFile {
+                end_offset,
+                file_size,
+                content,
+            }))
         }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }

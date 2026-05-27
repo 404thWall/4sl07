@@ -1,6 +1,8 @@
 use management_protocole::main_protocole::main_client::MainClient;
 use rustc_hash::FxHashMap;
 use slr07::management_protocole;
+use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
+use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use std::env;
 use std::time::Instant;
@@ -11,6 +13,8 @@ enum Mode {
     Server,
     Client,
     FileReader,
+    FileTransferServer,
+    FileTransferClient,
 }
 
 #[tokio::main]
@@ -23,6 +27,10 @@ async fn main() {
             server = Mode::Server;
         } else if args[1] == "client" {
             server = Mode::Client;
+        } else if args[1] == "file_transfer_server" {
+            server = Mode::FileTransferServer;
+        } else if args[1] == "file_transfer_client" {
+            server = Mode::FileTransferClient;
         }
     }
     let path = if args.len() < 2 {
@@ -62,6 +70,25 @@ async fn main() {
                 "Program finished! It took {:}s to run.",
                 start.elapsed().as_secs_f64()
             );
+        }
+        Mode::FileTransferClient => {
+            println!("Starting in file transfer client mode...");
+            if let Err(e) = management_protocole::client::start_client(
+                "137.194.140.198:9001",
+                FileClient::new(),
+            )
+            .await
+            {
+                eprintln!("File transfer client error: {}", e);
+            }
+        }
+        Mode::FileTransferServer => {
+            println!("Starting in file transfer server mode..");
+            if let Err(e) =
+                management_protocole::server::start_server("0.0.0.0:9001", FileServer::new()).await
+            {
+                eprintln!("File transfer server error: {}", e);
+            }
         }
     }
 }
