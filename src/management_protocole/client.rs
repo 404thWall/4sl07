@@ -23,8 +23,7 @@ pub async fn start_client(addr: &str, mut client: impl ClientHandler) -> Result<
     let stream: TcpStream = TcpStream::connect(addr).await?;
     println!("Connected to {}", addr);
 
-    let mut framed = tokio_util::codec::Framed::new(stream, CommandCodec);
-    framed.send(Packet::Connect(25565u16)).await?;
+    let framed = tokio_util::codec::Framed::new(stream, CommandCodec);
     let (mut sender, mut receiver) = framed.split();
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
 
