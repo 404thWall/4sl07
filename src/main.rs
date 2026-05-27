@@ -1,5 +1,4 @@
 use management_protocole::main_protocole::main_client::MainClient;
-use rustc_hash::FxHashMap;
 use slr07::management_protocole;
 use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
