@@ -46,6 +46,10 @@ pub async fn start_client(addr: &str, mut client: impl ClientHandler) -> Result<
                     tx.send(response).await.ok();
                 }
             }
+            Err(ProtocolError::ClosingConnection) => {
+                println!("Received a request to close the connection.");
+                break;
+            }
             Err(e) => {
                 return Err(e);
             }

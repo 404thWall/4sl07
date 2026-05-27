@@ -51,6 +51,8 @@ pub enum ProtocolError {
     UnexpectedPacket(Packet),
     #[error("Unexpected packet format: {0}")]
     UnexpectedPacketFormat(String),
+    #[error("Closing connection")]
+    ClosingConnection,
 }
 
 const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16 MB limit
