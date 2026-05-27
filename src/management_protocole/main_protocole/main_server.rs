@@ -11,6 +11,8 @@ use tokio::sync::RwLock;
 static MAP_TASKS_AMOUNT: usize = 20;
 static REDUCE_TASKS_AMOUNT: usize = 4;
 
+static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 static LAST_RECEIVED_PING: LazyLock<RwLock<HashMap<String, u32>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
@@ -21,11 +23,12 @@ static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
 
 pub struct MainServer {
     ping_task: Option<tokio::task::JoinHandle<()>>,
+    address: Option<String>,
 }
 
 impl MainServer {
     pub fn new() -> Self {
-        MainServer { ping_task: None }
+        MainServer { ping_task: None, address: None }
     }
 }
 
@@ -53,13 +56,14 @@ impl ServerHandler for MainServer {
             server_ping_task(&mut ping_tx, &addr).await;
         });
         self.ping_task = Some(ping_task);
+        self.address = Some(addr.to_string());
         Ok(())
     }
 
     async fn handle_packet(
         &mut self,
         packet: Packet,
-        _tx: Sender<OutMsg>,
+        tx: Sender<OutMsg>,
         addr: SocketAddr,
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
@@ -77,7 +81,7 @@ impl ServerHandler for MainServer {
                     "Received Connect from {} with server port {}",
                     addr, server_port
                 );
-                // Handle Connect if needed
+                CONNECTED_FILE_PORT.write().await.insert(addr.to_string(), server_port);
                 Ok(None)
             }
             Packet::AskForTask => {
@@ -92,6 +96,10 @@ impl ServerHandler for MainServer {
                     return Ok(Some(Packet::GiveTask(Task::None)));
                 }
                 let task = queue.swap_remove(0);
+                if let Task::Reduce(_, _) = task {
+                    let list = CONNECTED_FILE_PORT.read().await.clone();
+                    tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(list.into_iter().collect()))).await.ok();
+                }
                 println!("Assigning task {:?} to {}", task, addr);
                 Ok(Some(Packet::GiveTask(task)))
             }
@@ -134,6 +142,11 @@ impl ServerHandler for MainServer {
                 }
                 Ok(None)
             }
+            Packet::AskWorkersList => {
+                println!("Received AskWorkersList from {}", addr);
+                let list = CONNECTED_FILE_PORT.read().await.clone();
+                Ok(Some(Packet::ConnectedWorkersList(list.into_iter().collect())))
+            }
             _ => Ok(None),
         }
     }
@@ -142,6 +155,7 @@ impl ServerHandler for MainServer {
         if let Some(task) = &self.ping_task {
             task.abort();
         }
+        CONNECTED_FILE_PORT.write().await.remove(&self.address.as_ref().unwrap().to_string());
         Ok(())
     }
 }

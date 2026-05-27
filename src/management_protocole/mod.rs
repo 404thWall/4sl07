@@ -26,6 +26,8 @@ pub enum Packet {
         file_size: u64,   // Total size of the file in bytes
         content: Vec<u8>, // Contains the content of the file as bytes
     },
+    ConnectedWorkersList(Vec<(String, u16)>), // List of (IP, port) of connected workers
+    AskWorkersList,
 }
 
 #[derive(Debug, Clone)]
@@ -138,6 +140,22 @@ impl Encoder<Packet> for CommandCodec {
                 payload.put_u64(file_size);
                 payload.put_slice(&content);
             }
+            Packet::ConnectedWorkersList(list) => {
+                payload.put_u8(0x09); // Message type: SendConnectedWorkers
+                payload.put_u32(list.len() as u32);
+                for (addr, port) in list {
+                    let addr_bytes = addr.as_bytes();
+                    if addr_bytes.len() > 255 {
+                        return Err(ProtocolError::InvalidUtf8);
+                    }
+                    payload.put_u8(addr_bytes.len() as u8);
+                    payload.put_slice(addr_bytes);
+                    payload.put_u16(port);
+                }
+            }
+            Packet::AskWorkersList => {
+                payload.put_u8(0x0A); // Message type: AskWorkersList
+            }
         }
 
         // Write length-prefixed message
@@ -207,6 +225,25 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 content,
             }))
         }
+        0x09 => {
+            if payload.len() < 4 {
+                return Err(ProtocolError::UnexpectedPacketFormat(
+                    "Payload too short for SendConnectedWorkers".to_string(),
+                ));
+            }
+            let size = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
+            let mut list: Vec<(String, u16)> = Vec::new();
+            let mut offset = 4;
+            for _ in 0..size {
+                let string_size = u8::from_be_bytes([payload[offset]]) as usize;
+                let addr = str::from_utf8(&payload[offset+1..offset+1+string_size]).unwrap();
+                let port = u16::from_be_bytes([payload[offset + string_size + 1], payload[offset + string_size + 2]]);
+                list.push((addr.to_string(), port));
+                offset += string_size + 3;
+            }
+            Ok(Some(Packet::ConnectedWorkersList(list)))
+        }
+        0x0A => Ok(Some(Packet::AskWorkersList)),
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }
 }
