@@ -39,25 +39,31 @@ impl ServerHandler for FileServer {
     async fn handle_packet(
         &mut self,
         packet: Packet,
-        _tx: Sender<OutMsg>,
+        tx: Sender<OutMsg>,
         _addr: SocketAddr,
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
-            Packet::AskMapResultFile(offset) => {
-                println!("Received AskMapResultFile with offset: {}", offset);
+            Packet::AskMapResultFile => {
+                println!("Received AskMapResultFile request");
                 let path = "CC-MAIN-20230321002050-20230321032050-00486.warc.wet"; // Example file path
                 let mut file = File::open(path)?;
                 println!("Opened file: {}", path);
                 let mut content = vec![0u8; 15 * 1024 * 1024];
-                file.seek(std::io::SeekFrom::Start(offset))?;
-                let bytes_read = file.read(&mut content)?;
+                let mut offset = 0;
                 let size = file.metadata()?.len();
 
-                Ok(Some(Packet::MapResultFile {
-                    end_offset: offset + bytes_read as u64,
-                    file_size: size,
-                    content: content[..bytes_read].to_vec(),
-                }))
+                while offset < size {
+                    file.seek(std::io::SeekFrom::Start(offset))?;
+                    let bytes_read = file.read(&mut content)?;
+                    tx.send(OutMsg::MsgPacket(Packet::MapResultFile {
+                        end_offset: offset + bytes_read as u64,
+                        file_size: size,
+                        content: content[..bytes_read].to_vec(),
+                    })).await.ok();
+                    offset += bytes_read as u64;
+                }
+                
+                Ok(None)
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),
         }

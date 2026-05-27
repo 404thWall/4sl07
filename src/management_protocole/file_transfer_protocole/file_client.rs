@@ -28,7 +28,7 @@ impl Default for FileClient {
 impl ClientHandler for FileClient {
     async fn on_connection_established(&mut self, tx: Sender<Packet>) -> Result<(), ProtocolError> {
         self.begin_time = Some(std::time::Instant::now());
-        tx.send(Packet::AskMapResultFile(0)).await.ok();
+        tx.send(Packet::AskMapResultFile).await.ok();
         Ok(())
     }
 
@@ -57,9 +57,7 @@ impl ClientHandler for FileClient {
                     self.file_content = Some(vec);
                 }
 
-                if end_offset < file_size {
-                    Ok(Some(Packet::AskMapResultFile(end_offset)))
-                } else {
+                if end_offset >= file_size {
                     println!("File transfer complete");
                     write_file(
                         "received_map_result_file.txt",
@@ -70,8 +68,9 @@ impl ClientHandler for FileClient {
                         "Total time taken: {:.2?}",
                         self.begin_time.unwrap().elapsed()
                     );
-                    Ok(None)
                 }
+                
+                Ok(None)
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),
         }
