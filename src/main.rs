@@ -8,12 +8,15 @@ use std::time::Instant;
 pub mod map;
 use map::run;
 
+use crate::map::test_map;
+
 enum Mode {
     Server,
     Client,
     FileReader,
     FileTransferServer,
     FileTransferClient,
+    TestMap,
 }
 
 #[tokio::main]
@@ -30,12 +33,20 @@ async fn main() {
             server = Mode::FileTransferServer;
         } else if args[1] == "file_transfer_client" {
             server = Mode::FileTransferClient;
+        } else if args[1] == "testmap" {
+            server = Mode::TestMap;
         }
     }
     let path = if args.len() < 2 {
         "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
     } else if args.len() == 2 {
-        &args[1]
+        if args[1] == "testmap" {
+            "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
+        } else {
+            &args[1]
+        }
+    } else if args.len() == 3 && args[1] == "testmap" {
+        &args[2]
     } else {
         panic!("Too many args.")
     };
@@ -87,6 +98,12 @@ async fn main() {
                 management_protocole::server::start_server("0.0.0.0:9001", FileServer::new()).await
             {
                 eprintln!("File transfer server error: {}", e);
+            }
+        }
+        Mode::TestMap => {
+            println!("Testing the Map Implementation...");
+            if let Err(e) = test_map(path, 20) {
+                eprintln!("Error: {}", e);
             }
         }
     }
