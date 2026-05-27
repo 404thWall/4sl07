@@ -77,7 +77,14 @@ pub async fn start_server(
 
             while let Some(result) = receiver.next().await {
                 let response = match result {
-                    Ok(cmd) => server.handle_packet(cmd, tx.clone(), addr).await,
+                    Ok(cmd) => match server.handle_packet(cmd, tx.clone(), addr).await {
+                        Ok(res) => Ok(res),
+                        Err(e) => {
+                            eprintln!("Protocol error: {}", e);
+                            Err(e)
+                        }
+                    },
+
                     Err(e) => {
                         eprintln!("Protocol error: {}", e);
                         Err(e)
