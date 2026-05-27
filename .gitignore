@@ -4,3 +4,5 @@
 **/deployed_hosts.txt
 **/deploy_command.json
 **/deploy_history.jsonl
+*.txt
+*.wet
