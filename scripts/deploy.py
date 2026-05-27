@@ -51,7 +51,7 @@ def run_command(cmd: list[str]):
         process.join()
     
 
-def kill_previous_sessions(user: str) -> None:
+def kill_previous_sessions(user: str, should_wait: bool) -> None:
     with open("deployed_hosts.txt", "a+") as f:
         f.seek(0)
         hosts = [line.strip() for line in f if line.strip()]
@@ -59,8 +59,11 @@ def kill_previous_sessions(user: str) -> None:
         for i in range(0, len(hosts), batch_size):
             batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
             print(f"Killing sessions on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
-            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07"], user, batch_hosts)
+            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07-{user}"], user, batch_hosts)
             time.sleep(1)
+        print("Previous sessions killed. Waiting 30s for machines to be freed...")
+        if should_wait and len(hosts) > 0:
+            time.sleep(30)
 
 def scp(user: str, host: str, file: Path) -> None:
     try:
@@ -73,7 +76,7 @@ def scp(user: str, host: str, file: Path) -> None:
 
 def ssh_run(user: str, hosts: list[str], file: Path, cmd: str | None = None) -> None:
     command = cmd if cmd else f"{REMOTE_PATH}{file.name}"
-    run_command_batch(["ssh", "{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07 -d {command}"], user, hosts)
+    run_command_batch(["ssh", "{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07-{user} -d {command}"], user, hosts)
 
 
 def main() -> int:
@@ -111,7 +114,7 @@ def main() -> int:
         parser.error("--user is required to do anything (none found in CLI or memory)")
 
     print("Killing previous sessions...")
-    kill_previous_sessions(args.user)
+    kill_previous_sessions(args.user, not args.kill)
 
     if args.kill:
         log_execution(vars(args), status="success", session_id=session_id)
