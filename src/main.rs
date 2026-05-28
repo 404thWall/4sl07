@@ -103,7 +103,7 @@ async fn main() {
             if let Err(e) = management_protocole::client::start_client(
                 //"137.194.140.198:9001",
                 "127.0.0.1:9001",
-                FileClient::new(None, 0),
+                FileClient::new(Some("./reduce_data/temp_0".to_string()), 0),
             )
             .await
             {
