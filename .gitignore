@@ -1,5 +1,6 @@
 /target
 /splits
+/mapdata
 **/__pycache__
 **/deployed_hosts.txt
 **/deploy_command.json

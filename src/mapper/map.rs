@@ -2,7 +2,8 @@ use rustc_hash::FxHashMap;
 //Faster than base HashMap
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
-use std::time::Instant;
+use super::saver::save_map;
+
 
 static WORD_TO_TEST: &str = "the";
 
@@ -48,9 +49,12 @@ pub fn run(path: &str) -> std::io::Result<()> {
         //There are 4 additionnal bytes between body and next header : \r and \n repeated twice
         //We can simply discard them
         //We also now know the size of data to read, which gives :
-        chunk_bytes.resize(content_length + 6, 0);
+        let total_to_read = content_length + 6;
+        if chunk_bytes.len() < total_to_read {
+            chunk_bytes.resize(total_to_read, 0);
+        }
         reader
-            .read_exact(&mut chunk_bytes[..content_length + 6])
+            .read_exact(&mut chunk_bytes[..total_to_read])
             .unwrap();
 
         let contents: &mut str =
@@ -64,6 +68,9 @@ pub fn run(path: &str) -> std::io::Result<()> {
             count
         );
     }
+
+    let save_path = "./mapdata/mapdata.bin";
+    save_map(map, save_path).unwrap();
 
     Ok(())
 }
@@ -98,48 +105,6 @@ pub fn split_single_chunk(
             map.insert(word.to_string(), 1);
         }
     }
-
-    Ok(())
-}
-
-pub fn test_map(path: &str, number_of_tests: u32) -> std::io::Result<()> {
-    println!("Starting Map WITH headers taken into account...");
-    let start = Instant::now();
-    for _ in 0..number_of_tests {
-        run(path).unwrap();
-    }
-    let delay_with = start.elapsed().as_secs_f64();
-    println!("Executions finished! They took {:}s to run.\n", delay_with);
-
-    println!("Starting Map WITHOUT headers taken into account...");
-    let start = Instant::now();
-    for _ in 0..number_of_tests {
-        let mut map: FxHashMap<String, u32> = FxHashMap::default();
-        let mut file = File::open(path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        contents.make_ascii_lowercase();
-
-        split_single_chunk(&mut contents, &mut map).unwrap();
-
-        if let Some(count) = map.get(WORD_TO_TEST) {
-            println!(
-                "As an example, the word '{WORD_TO_TEST}' was present {} times",
-                count
-            );
-        }
-    }
-    let delay_without = start.elapsed().as_secs_f64();
-    println!(
-        "Executions finished! They took {:}s to run.\n",
-        delay_without
-    );
-
-    println!("   WITH headers (x{}) : {:}s", number_of_tests, delay_with);
-    println!(
-        "WITHOUT headers (x{}) : {:}s",
-        number_of_tests, delay_without
-    );
 
     Ok(())
 }

@@ -3,12 +3,9 @@ use slr07::management_protocole;
 use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
+use slr07::mapper::{run, test_map};
 use std::env;
 use std::time::Instant;
-pub mod map;
-use map::run;
-
-use crate::map::test_map;
 
 enum Mode {
     Server,
