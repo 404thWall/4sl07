@@ -73,14 +73,16 @@ async fn do_task(task: Task, tx: Sender<Packet>, connected_clients: Option<Vec<(
         Task::Reduce(_key, _nkeys) => {
             if let Some(clients) = connected_clients {
                 println!("Connected clients: {:?}", clients);
+                let mut i = 0;
                 for (addr, port) in clients {
                     if port == file_server_port {
                         continue; // Skip the file server itself
                     }
                     let addr = addr.split(":").next().unwrap_or("127.0.0.1").to_owned() + ":" + &port.to_string();
                     println!("Connecting to worker at {}", addr);
-                    let res = start_client(&addr, FileClient::new()).await;
+                    let res = start_client(&addr, FileClient::new(Some(format!("data_{}.txt", i)))).await;
                     println!("Finished connecting to worker at {}: {:?}", addr, res);
+                    i += 1;
                 }
             } else {
                 println!("No connected clients");

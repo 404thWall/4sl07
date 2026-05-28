@@ -6,22 +6,18 @@ use crate::management_protocole::{Packet, ProtocolError};
 use tokio::sync::mpsc::Sender;
 
 pub struct FileClient {
+    target_file: String,
     begin_time: Option<std::time::Instant>,
     file_content: Option<Vec<u8>>,
 }
 
 impl FileClient {
-    pub fn new() -> Self {
+    pub fn new(target_file: Option<String>) -> Self {
         FileClient {
+            target_file: target_file.unwrap_or_else(|| "map_result_file.txt".to_string()),
             begin_time: None,
             file_content: None,
         }
-    }
-}
-
-impl Default for FileClient {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -60,10 +56,10 @@ impl ClientHandler for FileClient {
                 if end_offset >= file_size {
                     println!("File transfer complete");
                     write_file(
-                        "received_map_result_file.txt",
+                        &self.target_file,
                         &self.file_content.as_mut().unwrap(),
                     )?;
-                    println!("File saved as received_map_result_file.txt");
+                    println!("File saved as {}", self.target_file);
                     println!(
                         "Total time taken: {:.2?}",
                         self.begin_time.unwrap().elapsed()
