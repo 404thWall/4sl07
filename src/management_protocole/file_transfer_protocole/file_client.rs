@@ -10,15 +10,17 @@ pub struct FileClient {
     begin_time: Option<std::time::Instant>,
     file_content: Option<Vec<u8>>,
     key: u32,
+    count: u32,
 }
 
 impl FileClient {
     pub fn new(target_file: Option<String>, key: u32) -> Self {
         FileClient {
-            target_file: target_file.unwrap_or_else(|| "map_result_file.txt".to_string()),
+            target_file: target_file.unwrap_or_else(|| "map_result_file".to_string()),
             begin_time: None,
             file_content: None,
             key,
+            count: 0,
         }
     }
 }
@@ -26,7 +28,7 @@ impl FileClient {
 impl ClientHandler for FileClient {
     async fn on_connection_established(&mut self, tx: Sender<Packet>) -> Result<(), ProtocolError> {
         self.begin_time = Some(std::time::Instant::now());
-        tx.send(Packet::AskMapResultFile).await.ok();
+        tx.send(Packet::AskMapResultFile(self.key)).await.ok();
         Ok(())
     }
 
@@ -56,17 +58,25 @@ impl ClientHandler for FileClient {
                 }
 
                 if end_offset >= file_size {
-                    println!("File transfer complete");
-                    write_file(&self.target_file, self.file_content.as_mut().unwrap())?;
-                    println!("File saved as {}", self.target_file);
-                    println!(
-                        "Total time taken: {:.2?}",
-                        self.begin_time.unwrap().elapsed()
-                    );
-                    return Err(ProtocolError::ClosingConnection);
+                    let file_name = format!("{}_{}", self.target_file, self.count);
+                    println!("Saving file to {}", file_name);
+                    write_file(&file_name, self.file_content.as_mut().unwrap())?;
+                    println!("File saved as {}", file_name);
+
+                    // Prepare for next file if needed
+                    self.file_content = None;
+                    self.count += 1;
                 }
 
                 Ok(None)
+            }
+            Packet::AllFilesSent => {
+                println!(
+                    "Total time taken: {:.2?}",
+                    self.begin_time.unwrap().elapsed()
+                );
+                println!("All files received, closing connection");
+                Err(ProtocolError::ClosingConnection)
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),
         }

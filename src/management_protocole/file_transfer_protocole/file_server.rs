@@ -43,27 +43,32 @@ impl ServerHandler for FileServer {
         _addr: SocketAddr,
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
-            Packet::AskMapResultFile => {
-                println!("Received AskMapResultFile request");
-                let path = "CC-MAIN-20230321002050-20230321032050-00486.warc.wet"; // Example file path
-                let mut file = File::open(path)?;
-                println!("Opened file: {}", path);
-                let mut content = vec![0u8; 15 * 1024 * 1024];
-                let mut offset = 0;
-                let size = file.metadata()?.len();
+            Packet::AskMapResultFile(key) => {
+                let paths = std::fs::read_dir("./map_data/").unwrap();
+                for path in paths {
+                    let path = path.unwrap().path();
+                    // Assuming files are named like "data_{reduce_key}_map_{map_key}"
+                    if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with(&format!("data_{}", key)) {
+                        println!("Found file for key {}: {}", key, path.display());
+                        let mut file = File::open(&path)?;
+                        let mut content = vec![0u8; 15 * 1024 * 1024];
+                        let mut offset = 0;
+                        let size = file.metadata()?.len();
 
-                while offset < size {
-                    file.seek(std::io::SeekFrom::Start(offset))?;
-                    let bytes_read = file.read(&mut content)?;
-                    tx.send(OutMsg::MsgPacket(Packet::MapResultFile {
-                        end_offset: offset + bytes_read as u64,
-                        file_size: size,
-                        content: content[..bytes_read].to_vec(),
-                    })).await.ok();
-                    offset += bytes_read as u64;
+                        while offset < size {
+                            file.seek(std::io::SeekFrom::Start(offset))?;
+                            let bytes_read = file.read(&mut content)?;
+                            tx.send(OutMsg::MsgPacket(Packet::MapResultFile {
+                                end_offset: offset + bytes_read as u64,
+                                file_size: size,
+                                content: content[..bytes_read].to_vec(),
+                            })).await.ok();
+                            offset += bytes_read as u64;
+                        }
+                    }
                 }
                 
-                Ok(None)
+                Ok(Some(Packet::AllFilesSent))
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),
         }

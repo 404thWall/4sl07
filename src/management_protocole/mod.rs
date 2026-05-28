@@ -26,12 +26,13 @@ pub enum Packet {
         task: Task,
         reduce_files: Vec<u32>, // List of keys for which this task produced a file
     },
-    AskMapResultFile,
+    AskMapResultFile(u32), // Ask for the files corresponding to the given Reduce key
     MapResultFile {
         end_offset: u64,  // The offset in the file after the content sent in this packet
         file_size: u64,   // Total size of the file in bytes
         content: Vec<u8>, // Contains the content of the file as bytes
     },
+    AllFilesSent,
     ConnectedWorkersList(Vec<(String, u16)>), // List of (IP, port) of connected workers
     AskWorkersList,
 }
@@ -152,8 +153,9 @@ impl Encoder<Packet> for CommandCodec {
                     payload.put_u32(key);
                 }
             }
-            Packet::AskMapResultFile => {
+            Packet::AskMapResultFile(key) => {
                 payload.put_u8(0x07); // Message type: AskMapResultFile
+                payload.put_u32(key);
             }
             Packet::MapResultFile {
                 end_offset,
@@ -180,6 +182,9 @@ impl Encoder<Packet> for CommandCodec {
             }
             Packet::AskWorkersList => {
                 payload.put_u8(0x0A); // Message type: AskWorkersList
+            }
+            Packet::AllFilesSent => {
+                payload.put_u8(0x0B); // Message type: AllFilesSent
             }
         }
 
@@ -263,7 +268,15 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 reduce_files: resulting_files,
             }))
         }
-        0x07 => Ok(Some(Packet::AskMapResultFile)),
+        0x07 => {
+            if payload.len() < 4 {
+                return Err(ProtocolError::UnexpectedPacketFormat(
+                    "Payload too short for AskMapResultFile".to_string(),
+                ));
+            }
+            let key = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]);
+            Ok(Some(Packet::AskMapResultFile(key)))
+        }
         0x08 => {
             if payload.len() < 16 {
                 return Err(ProtocolError::UnexpectedPacketFormat(
@@ -318,6 +331,7 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
             Ok(Some(Packet::ConnectedWorkersList(list)))
         }
         0x0A => Ok(Some(Packet::AskWorkersList)),
+        0x0B => Ok(Some(Packet::AllFilesSent)),
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }
 }

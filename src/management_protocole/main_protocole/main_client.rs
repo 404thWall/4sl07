@@ -107,7 +107,7 @@ async fn do_task(
                         + &port.to_string();
                     println!("Connecting to worker at {}", addr);
                     let res: Result<(), ProtocolError> =
-                        start_client(&addr, FileClient::new(Some(format!("data_{}.txt", i)), key))
+                        start_client(&addr, FileClient::new(Some(format!("./reduce_data/data_{}_{}", key, i)), key))
                             .await;
                     println!("Finished connecting to worker at {}: {:?}", addr, res);
                 }
