@@ -1,15 +1,26 @@
+use crate::tasks::{MAP_DATA_PATH, R};
 use rustc_hash::FxHashMap;
+
 //Faster than base HashMap
+use super::saver::save_one_map_r_files;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
-use super::saver::save_map;
 
-
-static WORD_TO_TEST: &str = "the";
-
-pub fn run(path: &str) -> std::io::Result<()> {
+/// ## The Map task
+/// Maps the file at `path` : counts the number time each word appears into the `map` arg.
+pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<()> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
 
+    map_file(path, &mut map).unwrap();
+
+    save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id)
+}
+
+pub fn run_map_task_default(path: &str) -> std::io::Result<()> {
+    run_map_task(path, R, 0)
+}
+
+pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result<()> {
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
 
@@ -59,23 +70,12 @@ pub fn run(path: &str) -> std::io::Result<()> {
 
         let contents: &mut str =
             str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
-        split_single_chunk(contents, &mut map).unwrap();
+        map_single_chunk(contents, map).unwrap();
     }
-
-    if let Some(count) = map.get(WORD_TO_TEST) {
-        println!(
-            "As an example, the word '{WORD_TO_TEST}' was present {} times",
-            count
-        );
-    }
-
-    let save_path = "./mapdata/mapdata.bin";
-    save_map(map, save_path).unwrap();
-
     Ok(())
 }
 
-pub fn split_single_chunk(
+pub fn map_single_chunk(
     contents: &mut str,
     map: &mut FxHashMap<String, u32>,
 ) -> std::io::Result<()> {

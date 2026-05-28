@@ -3,7 +3,7 @@ use slr07::management_protocole;
 use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
-use slr07::mapper::{run, test_map};
+use slr07::tasks::{run_map_task_default, test_map, test_reduce};
 use std::env;
 use std::time::Instant;
 
@@ -14,6 +14,7 @@ enum Mode {
     FileTransferServer,
     FileTransferClient,
     TestMap,
+    TestReduce,
 }
 
 #[tokio::main]
@@ -32,17 +33,19 @@ async fn main() {
             server = Mode::FileTransferClient;
         } else if args[1] == "testmap" {
             server = Mode::TestMap;
+        } else if args[1] == "testreduce" {
+            server = Mode::TestReduce
         }
     }
     let path = if args.len() < 2 {
         "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
     } else if args.len() == 2 {
-        if args[1] == "testmap" {
+        if (args[1] == "testmap") || (args[1] == "testreduce") {
             "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
         } else {
             &args[1]
         }
-    } else if args.len() == 3 && args[1] == "testmap" {
+    } else if args.len() == 3 && ((args[1] == "testmap") || (args[1] == "testreduce")) {
         &args[2]
     } else {
         panic!("Too many args.")
@@ -90,7 +93,7 @@ async fn main() {
         Mode::FileReader => {
             println!("Starting in file reader mode...");
             let start = Instant::now();
-            if let Err(e) = run(path) {
+            if let Err(e) = run_map_task_default(path) {
                 eprintln!("Error: {}", e);
             }
             println!(
@@ -121,6 +124,12 @@ async fn main() {
         Mode::TestMap => {
             println!("Testing the Map Implementation...");
             if let Err(e) = test_map(path, 20) {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Mode::TestReduce => {
+            println!("Testing the Reduce Implementation...");
+            if let Err(e) = test_reduce(path) {
                 eprintln!("Error: {}", e);
             }
         }
