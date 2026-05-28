@@ -84,11 +84,14 @@ async fn do_task(
 ) {
     match task {
         Task::Map(_key, _nkeys) => {
+            // Replace with actual map function
             tokio::time::sleep(Duration::from_secs(2)).await;
+
             let mut reduce_files = vec![];
             for i in 0..main_server::REDUCE_TASKS_AMOUNT {
                 reduce_files.push(i as u32);
             }
+            
             tx.send(Packet::TaskFinished { task, reduce_files })
                 .await
                 .ok();
@@ -114,7 +117,14 @@ async fn do_task(
             } else {
                 println!("No connected clients");
             }
+
+            // Replace with actual reduce function
             tokio::time::sleep(Duration::from_secs(3)).await;
+            
+            let temp_data_folder = std::path::Path::new("./reduce_data/");
+            if temp_data_folder.exists() {
+                std::fs::remove_dir_all(temp_data_folder).ok();
+            }
             tx.send(Packet::TaskFinished {
                 task,
                 reduce_files: vec![],
