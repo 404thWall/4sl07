@@ -7,3 +7,5 @@
 **/deploy_history.jsonl
 *.txt
 *.wet
+/map_data
+/reduce_data
