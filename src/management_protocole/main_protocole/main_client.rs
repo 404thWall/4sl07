@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::management_protocole::client::{ClientHandler, start_client};
 use crate::management_protocole::file_transfer_protocole::file_client::FileClient;
+use crate::management_protocole::main_protocole::main_server;
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use tokio::sync::mpsc::Sender;
 
@@ -67,7 +68,11 @@ async fn do_task(task: Task, tx: Sender<Packet>, connected_clients: Option<Vec<(
     match task {
         Task::Map(_key, _nkeys) => {
             tokio::time::sleep(Duration::from_secs(2)).await;
-            tx.send(Packet::TaskFinished(task)).await.ok();
+            let mut reduce_files = vec![];
+            for i in 0..main_server::REDUCE_TASKS_AMOUNT {
+                reduce_files.push(i as u32);
+            }
+            tx.send(Packet::TaskFinished{task, reduce_files}).await.ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::Reduce(_key, _nkeys) => {
@@ -88,7 +93,7 @@ async fn do_task(task: Task, tx: Sender<Packet>, connected_clients: Option<Vec<(
                 println!("No connected clients");
             }
             tokio::time::sleep(Duration::from_secs(3)).await;
-            tx.send(Packet::TaskFinished(task)).await.ok();
+            tx.send(Packet::TaskFinished{task, reduce_files: vec![]}).await.ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::None => {

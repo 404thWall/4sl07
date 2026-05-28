@@ -4,12 +4,12 @@ use crate::management_protocole::server::{OutMsg, ServerHandler};
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use tokio::sync::mpsc::Sender;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
-static MAP_TASKS_AMOUNT: usize = 20;
-static REDUCE_TASKS_AMOUNT: usize = 4;
+pub const MAP_TASKS_AMOUNT: usize = 20;
+pub const REDUCE_TASKS_AMOUNT: usize = 4;
 
 static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -20,6 +20,9 @@ static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![false; MAP_TASKS_AMOUNT], 0)));
 static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![false; REDUCE_TASKS_AMOUNT], 0)));
+
+static MAP_RESULT_FILES: LazyLock<RwLock<HashMap<u32, HashSet<String>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub struct MainServer {
     ping_task: Option<tokio::task::JoinHandle<()>>,
@@ -96,14 +99,15 @@ impl ServerHandler for MainServer {
                     return Ok(Some(Packet::GiveTask(Task::None)));
                 }
                 let task = queue.swap_remove(0);
-                if let Task::Reduce(_, _) = task {
+                if let Task::Reduce(key, _) = task {
                     let list = CONNECTED_FILE_PORT.read().await.clone();
+                    println!("Map result files for Reduce task {}: {:?}", key, MAP_RESULT_FILES.read().await.get(&key));
                     tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(list.into_iter().collect()))).await.ok();
                 }
                 println!("Assigning task {:?} to {}", task, addr);
                 Ok(Some(Packet::GiveTask(task)))
             }
-            Packet::TaskFinished(task) => {
+            Packet::TaskFinished{task, reduce_files} => {
                 println!("Received TaskFinished from {} for task: {:?}", addr, task);
                 match task {
                     Task::Map(key, _) => {
@@ -114,6 +118,16 @@ impl ServerHandler for MainServer {
                             println!("Marking Task Map {} as finished", key);
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
+
+                            println!("Storing resulting files for Map task {}: {:?}", key, reduce_files);
+                            let mut map = MAP_RESULT_FILES.write().await;
+                            for reduce_key in reduce_files {
+                                if let Some(set) = map.get_mut(&reduce_key) {
+                                    set.insert(addr.to_string());
+                                } else {
+                                    map.insert(reduce_key, HashSet::from([addr.to_string()]));
+                                }
+                            }
 
                             if tuple.1 == MAP_TASKS_AMOUNT as u32 {
                                 println!("All Map tasks finished, generating Reduce tasks...");

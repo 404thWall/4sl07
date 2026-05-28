@@ -19,7 +19,10 @@ pub enum Packet {
     Pong,
     AskForTask,
     GiveTask(Task),
-    TaskFinished(Task),
+    TaskFinished{
+        task: Task,
+        reduce_files: Vec<u32>, // List of keys for which this task produced a file
+    },
     AskMapResultFile,
     MapResultFile {
         end_offset: u64,  // The offset in the file after the content sent in this packet
@@ -123,9 +126,13 @@ impl Encoder<Packet> for CommandCodec {
                 payload.put_u8(0x05); // Message type: GiveTask
                 encode_task(&task, &mut payload);
             }
-            Packet::TaskFinished(task) => {
+            Packet::TaskFinished { task, reduce_files: resulting_files } => {
                 payload.put_u8(0x06); // Message type: TaskFinished
                 encode_task(&task, &mut payload);
+                payload.put_u32(resulting_files.len() as u32);
+                for key in resulting_files {
+                    payload.put_u32(key);
+                }
             }
             Packet::AskMapResultFile => {
                 payload.put_u8(0x07); // Message type: AskMapResultFile
@@ -191,7 +198,21 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         }
         0x06 => {
             let task = decode_task(payload)?;
-            Ok(Some(Packet::TaskFinished(task)))
+            let size = u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
+            if payload.len() < 13 + size * 4 {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let mut resulting_files = Vec::new();
+            for i in 0..size {
+                let key = u32::from_be_bytes([
+                    payload[13 + i * 4],
+                    payload[14 + i * 4],
+                    payload[15 + i * 4],
+                    payload[16 + i * 4],
+                ]);
+                resulting_files.push(key);
+            }
+            Ok(Some(Packet::TaskFinished { task, reduce_files: resulting_files }))
         }
         0x07 => Ok(Some(Packet::AskMapResultFile)),
         0x08 => {
