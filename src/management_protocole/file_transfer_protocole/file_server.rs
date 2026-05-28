@@ -48,7 +48,14 @@ impl ServerHandler for FileServer {
                 for path in paths {
                     let path = path.unwrap().path();
                     // Assuming files are named like "data_{reduce_key}_map_{map_key}"
-                    if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with(&format!("data_{}", key)) {
+                    if path.is_file()
+                        && path
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .starts_with(&format!("data_{}", key))
+                    {
                         println!("Found file for key {}: {}", key, path.display());
                         let mut file = File::open(&path)?;
                         let mut content = vec![0u8; 15 * 1024 * 1024];
@@ -62,12 +69,14 @@ impl ServerHandler for FileServer {
                                 end_offset: offset + bytes_read as u64,
                                 file_size: size,
                                 content: content[..bytes_read].to_vec(),
-                            })).await.ok();
+                            }))
+                            .await
+                            .ok();
                             offset += bytes_read as u64;
                         }
                     }
                 }
-                
+
                 Ok(Some(Packet::AllFilesSent))
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),

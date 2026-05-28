@@ -91,7 +91,7 @@ async fn do_task(
             for i in 0..main_server::REDUCE_TASKS_AMOUNT {
                 reduce_files.push(i as u32);
             }
-            
+
             tx.send(Packet::TaskFinished { task, reduce_files })
                 .await
                 .ok();
@@ -109,9 +109,11 @@ async fn do_task(
                         + ":"
                         + &port.to_string();
                     println!("Connecting to worker at {}", addr);
-                    let res: Result<(), ProtocolError> =
-                        start_client(&addr, FileClient::new(Some(format!("./reduce_data/data_{}_{}", key, i)), key))
-                            .await;
+                    let res: Result<(), ProtocolError> = start_client(
+                        &addr,
+                        FileClient::new(Some(format!("./reduce_data/data_{}_{}", key, i)), key),
+                    )
+                    .await;
                     println!("Finished connecting to worker at {}: {:?}", addr, res);
                 }
             } else {
@@ -120,7 +122,7 @@ async fn do_task(
 
             // Replace with actual reduce function
             tokio::time::sleep(Duration::from_secs(3)).await;
-            
+
             let temp_data_folder = std::path::Path::new("./reduce_data/");
             if temp_data_folder.exists() {
                 std::fs::remove_dir_all(temp_data_folder).ok();
