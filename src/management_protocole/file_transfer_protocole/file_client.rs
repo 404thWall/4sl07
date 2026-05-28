@@ -9,14 +9,16 @@ pub struct FileClient {
     target_file: String,
     begin_time: Option<std::time::Instant>,
     file_content: Option<Vec<u8>>,
+    key: u32,
 }
 
 impl FileClient {
-    pub fn new(target_file: Option<String>) -> Self {
+    pub fn new(target_file: Option<String>, key: u32) -> Self {
         FileClient {
             target_file: target_file.unwrap_or_else(|| "map_result_file.txt".to_string()),
             begin_time: None,
             file_content: None,
+            key,
         }
     }
 }
@@ -55,10 +57,7 @@ impl ClientHandler for FileClient {
 
                 if end_offset >= file_size {
                     println!("File transfer complete");
-                    write_file(
-                        &self.target_file,
-                        &self.file_content.as_mut().unwrap(),
-                    )?;
+                    write_file(&self.target_file, self.file_content.as_mut().unwrap())?;
                     println!("File saved as {}", self.target_file);
                     println!(
                         "Total time taken: {:.2?}",
@@ -66,7 +65,7 @@ impl ClientHandler for FileClient {
                     );
                     return Err(ProtocolError::ClosingConnection);
                 }
-                
+
                 Ok(None)
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),

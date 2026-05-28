@@ -31,7 +31,10 @@ pub struct MainServer {
 
 impl MainServer {
     pub fn new() -> Self {
-        MainServer { ping_task: None, address: None }
+        MainServer {
+            ping_task: None,
+            address: None,
+        }
     }
 }
 
@@ -84,7 +87,10 @@ impl ServerHandler for MainServer {
                     "Received Connect from {} with server port {}",
                     addr, server_port
                 );
-                CONNECTED_FILE_PORT.write().await.insert(addr.to_string(), server_port);
+                CONNECTED_FILE_PORT
+                    .write()
+                    .await
+                    .insert(addr.to_string(), server_port);
                 Ok(None)
             }
             Packet::AskForTask => {
@@ -93,21 +99,45 @@ impl ServerHandler for MainServer {
                 if queue.is_empty() {
                     if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
                         println!("All tasks are finished, sending None to {}", addr);
-                        return Ok(Some(Packet::GiveTask(Task::Finished)));
+                        return Ok(Some(Packet::GiveTask {
+                            task: Task::Finished,
+                            files_hosts: Vec::new(),
+                        }));
                     }
                     println!("No more tasks available for {}, sending None", addr);
-                    return Ok(Some(Packet::GiveTask(Task::None)));
+                    return Ok(Some(Packet::GiveTask {
+                        task: Task::None,
+                        files_hosts: Vec::new(),
+                    }));
                 }
                 let task = queue.swap_remove(0);
-                if let Task::Reduce(key, _) = task {
+                let files_hosts = if let Task::Reduce(key, _) = task {
                     let list = CONNECTED_FILE_PORT.read().await.clone();
-                    println!("Map result files for Reduce task {}: {:?}", key, MAP_RESULT_FILES.read().await.get(&key));
-                    tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(list.into_iter().collect()))).await.ok();
-                }
+                    println!(
+                        "Map result files for Reduce task {}: {:?}",
+                        key,
+                        MAP_RESULT_FILES.read().await.get(&key)
+                    );
+                    tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(
+                        list.into_iter().collect(),
+                    )))
+                    .await
+                    .ok();
+                    MAP_RESULT_FILES
+                        .read()
+                        .await
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect()
+                } else {
+                    vec![]
+                };
                 println!("Assigning task {:?} to {}", task, addr);
-                Ok(Some(Packet::GiveTask(task)))
+                Ok(Some(Packet::GiveTask { task, files_hosts }))
             }
-            Packet::TaskFinished{task, reduce_files} => {
+            Packet::TaskFinished { task, reduce_files } => {
                 println!("Received TaskFinished from {} for task: {:?}", addr, task);
                 match task {
                     Task::Map(key, _) => {
@@ -119,7 +149,10 @@ impl ServerHandler for MainServer {
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
 
-                            println!("Storing resulting files for Map task {}: {:?}", key, reduce_files);
+                            println!(
+                                "Storing resulting files for Map task {}: {:?}",
+                                key, reduce_files
+                            );
                             let mut map = MAP_RESULT_FILES.write().await;
                             for reduce_key in reduce_files {
                                 if let Some(set) = map.get_mut(&reduce_key) {
@@ -159,7 +192,9 @@ impl ServerHandler for MainServer {
             Packet::AskWorkersList => {
                 println!("Received AskWorkersList from {}", addr);
                 let list = CONNECTED_FILE_PORT.read().await.clone();
-                Ok(Some(Packet::ConnectedWorkersList(list.into_iter().collect())))
+                Ok(Some(Packet::ConnectedWorkersList(
+                    list.into_iter().collect(),
+                )))
             }
             _ => Ok(None),
         }
@@ -169,7 +204,10 @@ impl ServerHandler for MainServer {
         if let Some(task) = &self.ping_task {
             task.abort();
         }
-        CONNECTED_FILE_PORT.write().await.remove(&self.address.as_ref().unwrap().to_string());
+        CONNECTED_FILE_PORT
+            .write()
+            .await
+            .remove(&self.address.as_ref().unwrap().to_string());
         Ok(())
     }
 }

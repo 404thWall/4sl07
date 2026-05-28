@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::management_protocole::client::{ClientHandler, start_client};
@@ -6,7 +7,7 @@ use crate::management_protocole::main_protocole::main_server;
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use tokio::sync::mpsc::Sender;
 
-pub struct MainClient{
+pub struct MainClient {
     file_server_port: u16,
     connected_clients: Option<Vec<(String, u16)>>,
 }
@@ -41,12 +42,22 @@ impl ClientHandler for MainClient {
                 println!("Received Pong");
                 Ok(None)
             }
-            Packet::GiveTask(task) => {
-                println!("Received GiveTask with task: {:?}", task);
+            Packet::GiveTask { task, files_hosts } => {
+                println!(
+                    "Received GiveTask with task: {:?} and files_hosts: {:?}",
+                    task, files_hosts
+                );
                 let connected_clients = self.connected_clients.clone();
                 let file_server_port = self.file_server_port;
                 tokio::spawn(async move {
-                    do_task(task, tx.clone(), connected_clients, file_server_port).await;
+                    do_task(
+                        task,
+                        tx.clone(),
+                        connected_clients,
+                        file_server_port,
+                        files_hosts,
+                    )
+                    .await;
                 });
                 Ok(None)
             }
@@ -64,7 +75,13 @@ impl ClientHandler for MainClient {
     }
 }
 
-async fn do_task(task: Task, tx: Sender<Packet>, connected_clients: Option<Vec<(String, u16)>>, file_server_port: u16) {
+async fn do_task(
+    task: Task,
+    tx: Sender<Packet>,
+    connected_clients: Option<Vec<(String, u16)>>,
+    _file_server_port: u16,
+    files_hosts: Vec<String>,
+) {
     match task {
         Task::Map(_key, _nkeys) => {
             tokio::time::sleep(Duration::from_secs(2)).await;
@@ -72,28 +89,38 @@ async fn do_task(task: Task, tx: Sender<Packet>, connected_clients: Option<Vec<(
             for i in 0..main_server::REDUCE_TASKS_AMOUNT {
                 reduce_files.push(i as u32);
             }
-            tx.send(Packet::TaskFinished{task, reduce_files}).await.ok();
+            tx.send(Packet::TaskFinished { task, reduce_files })
+                .await
+                .ok();
             tx.send(Packet::AskForTask).await.ok();
         }
-        Task::Reduce(_key, _nkeys) => {
+        Task::Reduce(key, _nkeys) => {
             if let Some(clients) = connected_clients {
                 println!("Connected clients: {:?}", clients);
-                let mut i = 0;
-                for (addr, port) in clients {
-                    if port == file_server_port {
-                        continue; // Skip the file server itself
-                    }
-                    let addr = addr.split(":").next().unwrap_or("127.0.0.1").to_owned() + ":" + &port.to_string();
+                let map: HashMap<String, u16> = HashMap::from_iter(
+                    clients.iter().map(|(addr, port)| (addr.to_string(), *port)),
+                );
+                for (i, addr) in files_hosts.iter().enumerate() {
+                    let port = *map.get(addr).unwrap();
+                    let addr = addr.split(":").next().unwrap_or("127.0.0.1").to_owned()
+                        + ":"
+                        + &port.to_string();
                     println!("Connecting to worker at {}", addr);
-                    let res = start_client(&addr, FileClient::new(Some(format!("data_{}.txt", i)))).await;
+                    let res: Result<(), ProtocolError> =
+                        start_client(&addr, FileClient::new(Some(format!("data_{}.txt", i)), key))
+                            .await;
                     println!("Finished connecting to worker at {}: {:?}", addr, res);
-                    i += 1;
                 }
             } else {
                 println!("No connected clients");
             }
             tokio::time::sleep(Duration::from_secs(3)).await;
-            tx.send(Packet::TaskFinished{task, reduce_files: vec![]}).await.ok();
+            tx.send(Packet::TaskFinished {
+                task,
+                reduce_files: vec![],
+            })
+            .await
+            .ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::None => {

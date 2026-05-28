@@ -18,8 +18,11 @@ pub enum Packet {
     Ping,
     Pong,
     AskForTask,
-    GiveTask(Task),
-    TaskFinished{
+    GiveTask {
+        task: Task,
+        files_hosts: Vec<String>, // List of hosts that have the files needed for this task (only for Reduce tasks)
+    },
+    TaskFinished {
         task: Task,
         reduce_files: Vec<u32>, // List of keys for which this task produced a file
     },
@@ -122,11 +125,26 @@ impl Encoder<Packet> for CommandCodec {
             Packet::AskForTask => {
                 payload.put_u8(0x04); // Message type: AskForTask
             }
-            Packet::GiveTask(task) => {
+            Packet::GiveTask {
+                task,
+                files_hosts: files_host,
+            } => {
                 payload.put_u8(0x05); // Message type: GiveTask
                 encode_task(&task, &mut payload);
+                payload.put_u32(files_host.len() as u32);
+                for host in files_host {
+                    let host_bytes = host.as_bytes();
+                    if host_bytes.len() > 255 {
+                        return Err(ProtocolError::InvalidUtf8);
+                    }
+                    payload.put_u8(host_bytes.len() as u8);
+                    payload.put_slice(host_bytes);
+                }
             }
-            Packet::TaskFinished { task, reduce_files: resulting_files } => {
+            Packet::TaskFinished {
+                task,
+                reduce_files: resulting_files,
+            } => {
                 payload.put_u8(0x06); // Message type: TaskFinished
                 encode_task(&task, &mut payload);
                 payload.put_u32(resulting_files.len() as u32);
@@ -194,11 +212,39 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         0x04 => Ok(Some(Packet::AskForTask)),
         0x05 => {
             let task = decode_task(payload)?;
-            Ok(Some(Packet::GiveTask(task)))
+            let mut offset = 9; // 1 byte for task type + 8 bytes for task data
+            let size = u32::from_be_bytes([
+                payload[offset],
+                payload[offset + 1],
+                payload[offset + 2],
+                payload[offset + 3],
+            ]) as usize;
+            offset += 4;
+            if payload.len() < offset + size * 4 {
+                return Err(ProtocolError::InvalidMessageType(msg_type));
+            }
+            let mut files_host = Vec::new();
+            for _ in 0..size {
+                let string_size = payload[offset] as usize;
+                offset += 1;
+                if payload.len() < offset + string_size {
+                    return Err(ProtocolError::InvalidMessageType(msg_type));
+                }
+                let host = std::str::from_utf8(&payload[offset..offset + string_size])
+                    .map_err(|_| ProtocolError::InvalidUtf8)?
+                    .to_string();
+                offset += string_size;
+                files_host.push(host);
+            }
+            Ok(Some(Packet::GiveTask {
+                task,
+                files_hosts: files_host,
+            }))
         }
         0x06 => {
             let task = decode_task(payload)?;
-            let size = u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
+            let size =
+                u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
             if payload.len() < 13 + size * 4 {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
@@ -212,7 +258,10 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 ]);
                 resulting_files.push(key);
             }
-            Ok(Some(Packet::TaskFinished { task, reduce_files: resulting_files }))
+            Ok(Some(Packet::TaskFinished {
+                task,
+                reduce_files: resulting_files,
+            }))
         }
         0x07 => Ok(Some(Packet::AskMapResultFile)),
         0x08 => {
@@ -252,13 +301,17 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                     "Payload too short for SendConnectedWorkers".to_string(),
                 ));
             }
-            let size = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
+            let size =
+                u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
             let mut list: Vec<(String, u16)> = Vec::new();
             let mut offset = 4;
             for _ in 0..size {
                 let string_size = u8::from_be_bytes([payload[offset]]) as usize;
-                let addr = str::from_utf8(&payload[offset+1..offset+1+string_size]).unwrap();
-                let port = u16::from_be_bytes([payload[offset + string_size + 1], payload[offset + string_size + 2]]);
+                let addr = str::from_utf8(&payload[offset + 1..offset + 1 + string_size]).unwrap();
+                let port = u16::from_be_bytes([
+                    payload[offset + string_size + 1],
+                    payload[offset + string_size + 2],
+                ]);
                 list.push((addr.to_string(), port));
                 offset += string_size + 3;
             }

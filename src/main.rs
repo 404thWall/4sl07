@@ -67,17 +67,22 @@ async fn main() {
             };
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
-                if let Err(e) = management_protocole::server::start_server(&format!("0.0.0.0:{}", file_server_port), FileServer::new())
-                    .await
+                if let Err(e) = management_protocole::server::start_server(
+                    &format!("0.0.0.0:{}", file_server_port),
+                    FileServer::new(),
+                )
+                .await
                 {
                     eprintln!("File transfer server error: {}", e);
                 }
             });
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             println!("Starting main client...");
-            if let Err(e) =
-                management_protocole::client::start_client("127.0.0.1:9000", MainClient::new(file_server_port))
-                    .await
+            if let Err(e) = management_protocole::client::start_client(
+                "127.0.0.1:9000",
+                MainClient::new(file_server_port),
+            )
+            .await
             {
                 eprintln!("Client error: {}", e);
             }
@@ -98,7 +103,7 @@ async fn main() {
             if let Err(e) = management_protocole::client::start_client(
                 //"137.194.140.198:9001",
                 "127.0.0.1:9001",
-                FileClient::new(None),
+                FileClient::new(None, 0),
             )
             .await
             {
