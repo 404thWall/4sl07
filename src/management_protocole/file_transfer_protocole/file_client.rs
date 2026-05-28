@@ -78,6 +78,12 @@ impl ClientHandler for FileClient {
 }
 
 fn write_file(path: &str, content: &[u8]) -> std::io::Result<()> {
+    let path = std::path::Path::new(path);
+    if let Some(folder) = path.parent() {
+        if !folder.exists() {
+            std::fs::create_dir_all(folder)?;
+        }
+    }
     let mut file = File::create(path)?;
     file.write_all(content)?;
     Ok(())
