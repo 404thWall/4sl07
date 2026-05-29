@@ -142,6 +142,24 @@ pub fn test_result() -> std::io::Result<()> {
     let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
     reduce_directory(RESULT_PATH, &mut result_map).unwrap();
 
+    if let Some(count) = map.get(WORD_TO_TEST) {
+        println!(
+            "The word '{WORD_TO_TEST}' was present {} times in the manual map!",
+            count
+        );
+    } else {
+        println!("The word '{WORD_TO_TEST}' was not present in the manual map...")
+    }
+
+    if let Some(count) = result_map.get(WORD_TO_TEST) {
+        println!(
+            "The word '{WORD_TO_TEST}' was present {} times in the result map!",
+            count
+        );
+    } else {
+        println!("The word '{WORD_TO_TEST}' was not present in the result map...")
+    }
+
     for (key, value) in map.clone() {
         println!("Testing : {key} / {value}");
         assert!(result_map.contains_key(&key));
