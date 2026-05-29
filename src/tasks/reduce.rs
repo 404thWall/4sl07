@@ -3,7 +3,8 @@ use std::{fs, path::Path};
 use rustc_hash::FxHashMap;
 
 use crate::tasks::{
-    REDUCE_INITIAL_DATA_PATH, RESULT_PATH, saver::{load_map, save_one_map_one_file}
+    REDUCE_INITIAL_DATA_PATH, RESULT_PATH,
+    saver::{load_map, save_one_map_one_file},
 };
 
 /// ## The Reduce task

@@ -3,7 +3,8 @@ use rustc_hash::FxHashMap;
 use std::{
     fs::{self, File},
     hash::{DefaultHasher, Hash, Hasher},
-    io::{BufReader, BufWriter}, path::Path,
+    io::{BufReader, BufWriter},
+    path::Path,
 };
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
