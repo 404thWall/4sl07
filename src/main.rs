@@ -77,6 +77,11 @@ async fn main() {
             } else {
                 9001
             };
+            let main_host = if args.len() >= 4 {
+                args[3].clone()
+            } else {
+                "127.0.0.1".to_string()
+            };
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
                 if let Err(e) = management_protocole::server::start_server(
@@ -91,7 +96,7 @@ async fn main() {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             println!("Starting main client...");
             if let Err(e) = management_protocole::client::start_client(
-                "137.194.140.198:9000",
+                &format!("{}:9000", main_host),
                 MainClient::new(file_server_port),
             )
             .await
