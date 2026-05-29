@@ -116,6 +116,9 @@ def main() -> int:
     parser.add_argument("--no-scp", action="store_false", dest="scp",
                         help="Do not scp the file to the machines, assume it is already there")
 
+    parser.add_argument("--append-hosts", action="store_true",
+                        help="Append to deployed_hosts.txt instead of overwriting it")    
+
     args = parser.parse_args()
     session_id = log_execution(vars(args), status="running")
 
@@ -161,7 +164,8 @@ def main() -> int:
             log_execution(vars(args), status="success", session_id=session_id)
             return 0
 
-    with open("deployed_hosts.txt", "w+") as f:
+    mode = "a" if args.append_hosts else "w+"
+    with open("deployed_hosts.txt", mode) as f:
         batch_size = 5
         for i in range(0, len(hosts), batch_size):
             batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
