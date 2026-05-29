@@ -214,6 +214,11 @@ async fn server_ping_task(tx: &mut Sender<OutMsg>, addr: &std::net::SocketAddr) 
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(10));
     loop {
         ticker.tick().await;
+        println!(
+            "Sending Ping to {} at {:?}",
+            addr,
+            std::time::SystemTime::now()
+        );
         if tx.send(OutMsg::MsgPacket(Packet::Ping)).await.is_err() {
             break;
         }

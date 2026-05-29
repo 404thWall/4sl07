@@ -59,6 +59,7 @@ impl ClientHandler for MainClient {
                     )
                     .await;
                 });
+                println!("Launched task in background");
                 Ok(None)
             }
             Packet::ConnectedWorkersList(list) => {
