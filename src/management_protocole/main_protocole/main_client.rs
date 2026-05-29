@@ -175,6 +175,15 @@ async fn do_task(
         }
         Task::Finished => {
             println!("All tasks are finished, client is done!");
+            println!("Cleaning up temporary files...");
+            for path in crate::tasks::FOLDERS_TO_DELETE {
+                let temp_data_folder: &std::path::Path = std::path::Path::new(path);
+                println!("Deleting {}...", temp_data_folder.display());
+                if temp_data_folder.exists() {
+                    std::fs::remove_dir_all(temp_data_folder).ok();
+                }
+            }
+            println!("Exiting...");
             std::process::exit(0);
         }
     }
