@@ -10,3 +10,5 @@
 *.wet
 /map_data
 /reduce_data
+/data
+/result
