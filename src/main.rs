@@ -55,7 +55,7 @@ async fn main() {
         Mode::Server => {
             println!("Starting in server mode...");
             if let Err(e) =
-                management_protocole::server::start_server("127.0.0.1:9000", MainServer::new())
+                management_protocole::server::start_server("0.0.0.0:9000", MainServer::new())
                     .await
             {
                 eprintln!("Server error: {}", e);
@@ -82,7 +82,7 @@ async fn main() {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             println!("Starting main client...");
             if let Err(e) = management_protocole::client::start_client(
-                "127.0.0.1:9000",
+                "137.194.140.198:9000",
                 MainClient::new(file_server_port),
             )
             .await
