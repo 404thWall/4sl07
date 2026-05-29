@@ -48,7 +48,7 @@ async fn main() {
     } else if args.len() == 3 && ((args[1] == "testmap") || (args[1] == "testreduce")) {
         &args[2]
     } else {
-        &args[2]
+        ""
     };
 
     match server {
