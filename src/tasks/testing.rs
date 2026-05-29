@@ -1,6 +1,7 @@
 use super::map::{map_file, map_single_chunk};
 use super::reduce::reduce_directory;
 use super::saver::{save_one_map_one_file, save_one_map_r_files};
+use super::{INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, RESULT_PATH};
 use rustc_hash::FxHashMap;
 use std::fs::File;
 use std::io::Read;
@@ -84,6 +85,72 @@ pub fn test_reduce(path: &str) -> std::io::Result<()> {
     }
 
     println!("Reduce tests passed successfully!");
+
+    Ok(())
+}
+
+pub fn get_test_word_count_from_result(result_directory_path: &str) -> std::io::Result<u32> {
+    let mut map: FxHashMap<String, u32> = FxHashMap::default();
+    reduce_directory(result_directory_path, &mut map).unwrap();
+
+    if let Some(count) = map.get(WORD_TO_TEST) {
+        println!(
+            "The word '{WORD_TO_TEST}' was present {} times in the result!",
+            count
+        );
+        return Ok(*count);
+    }
+
+    println!("The word '{WORD_TO_TEST}' was not present in the result...");
+
+    Ok(0)
+}
+
+pub fn test_result() -> std::io::Result<()> {
+    println!("Starting manual map of the {MAP_TASKS_AMOUNT} first files...");
+    let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
+    let mut candidates = vec![];
+    for path in paths {
+        let path = path.unwrap().path();
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("CC-MAIN-")
+        {
+            candidates.push(path);
+        }
+    }
+    candidates.sort();
+
+    let mut map: FxHashMap<String, u32> = FxHashMap::default();
+    for (i, file) in candidates.iter().enumerate().take(MAP_TASKS_AMOUNT) {
+        if let Some(file_path) = file.file_name() {
+            println!("Starting {i}th map task");
+            map_file(file_path.to_str().unwrap(), &mut map).unwrap();
+        } else {
+            panic!("Failed to start the {i}th map task.")
+        }
+    }
+
+    println!("Finished manual map of the {MAP_TASKS_AMOUNT} first files...");
+    println!("Starting manual reduce of the {REDUCE_TASKS_AMOUNT} result files...");
+
+    let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
+    reduce_directory(RESULT_PATH, &mut result_map).unwrap();
+
+    for (key, value) in map.clone() {
+        assert!(result_map.contains_key(&key));
+        assert_eq!(value, *result_map.get(&key).unwrap());
+    }
+    for (key, value) in result_map {
+        assert!(map.contains_key(&key));
+        assert_eq!(value, *map.get(&key).unwrap());
+    }
+
+    println!("Test passed successfully!");
 
     Ok(())
 }

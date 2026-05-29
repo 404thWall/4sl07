@@ -4,7 +4,7 @@ mod saver;
 mod testing;
 pub use map::{run_map_task, run_map_task_default};
 pub use reduce::{run_reduce_task, run_reduce_task_default};
-pub use testing::{test_map, test_reduce};
+pub use testing::{get_test_word_count_from_result, test_map, test_reduce, test_result};
 
 pub const R: usize = 10;
 pub const INITIAL_DATA_PATH: &str = "/cal/commoncrawl/";

@@ -3,7 +3,9 @@ use slr07::management_protocole;
 use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
-use slr07::tasks::{run_map_task_default, test_map, test_reduce};
+use slr07::tasks::{
+    get_test_word_count_from_result, run_map_task_default, test_map, test_reduce, test_result,
+};
 use std::env;
 use std::time::Instant;
 
@@ -15,6 +17,8 @@ enum Mode {
     FileTransferClient,
     TestMap,
     TestReduce,
+    TestWordCount,
+    TestResult,
 }
 
 #[tokio::main]
@@ -35,17 +39,23 @@ async fn main() {
             server = Mode::TestMap;
         } else if args[1] == "testreduce" {
             server = Mode::TestReduce
+        } else if args[1] == "testwordcount" {
+            server = Mode::TestWordCount
+        } else if args[1] == "testresult" {
+            server = Mode::TestResult
         }
     }
     let path = if args.len() < 2 {
         "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
     } else if args.len() == 2 {
-        if (args[1] == "testmap") || (args[1] == "testreduce") {
+        if (args[1] == "testmap") || (args[1] == "testreduce") || (args[1] == "testwordcount") {
             "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
         } else {
             &args[1]
         }
-    } else if args.len() == 3 && ((args[1] == "testmap") || (args[1] == "testreduce")) {
+    } else if args.len() == 3
+        && ((args[1] == "testmap") || (args[1] == "testreduce") || (args[1] == "testwordcount"))
+    {
         &args[2]
     } else {
         ""
@@ -55,8 +65,7 @@ async fn main() {
         Mode::Server => {
             println!("Starting in server mode...");
             if let Err(e) =
-                management_protocole::server::start_server("0.0.0.0:9000", MainServer::new())
-                    .await
+                management_protocole::server::start_server("0.0.0.0:9000", MainServer::new()).await
             {
                 eprintln!("Server error: {}", e);
             }
@@ -130,6 +139,18 @@ async fn main() {
         Mode::TestReduce => {
             println!("Testing the Reduce Implementation...");
             if let Err(e) = test_reduce(path) {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Mode::TestWordCount => {
+            println!("Fetching the test word count from the result...");
+            if let Err(e) = get_test_word_count_from_result(path) {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Mode::TestResult => {
+            println!("Testing the result from the deployement...");
+            if let Err(e) = test_result() {
                 eprintln!("Error: {}", e);
             }
         }
