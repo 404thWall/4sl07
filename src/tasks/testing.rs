@@ -137,7 +137,9 @@ pub fn test_result() -> std::io::Result<()> {
     }
 
     println!("Finished manual map of the {MAP_TASKS_AMOUNT} first files...");
-    println!("Starting manual reduce of the {REDUCE_TASKS_AMOUNT} result files...");
+    println!(
+        "Starting manual reduce of the {REDUCE_TASKS_AMOUNT} result files in {RESULT_PATH}..."
+    );
 
     let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
     reduce_directory(RESULT_PATH, &mut result_map).unwrap();
@@ -159,6 +161,12 @@ pub fn test_result() -> std::io::Result<()> {
     } else {
         println!("The word '{WORD_TO_TEST}' was not present in the result map...")
     }
+
+    println!("There are {} keys in the manual map", map.keys().len());
+    println!(
+        "There are {} keys in the result map",
+        result_map.keys().len()
+    );
 
     for (key, value) in map.clone() {
         println!("Testing : {key} / {value}");
