@@ -113,10 +113,9 @@ def main() -> int:
         log_execution(vars(args), status="error", session_id=session_id)
         parser.error("--user is required to do anything (none found in CLI or memory)")
 
-    print("Killing previous sessions...")
-    kill_previous_sessions(args.user, not args.kill)
-
     if args.kill:
+        print("Killing previous sessions...")
+        kill_previous_sessions(args.user, not args.kill)
         log_execution(vars(args), status="success", session_id=session_id)
         return 0
     
