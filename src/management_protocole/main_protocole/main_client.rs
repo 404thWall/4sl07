@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::management_protocole::client::{ClientHandler, start_client};
 use crate::management_protocole::file_transfer_protocole::file_client::FileClient;
 use crate::management_protocole::{Packet, ProtocolError, Task};
-use crate::tasks::{REDUCE_TASKS_AMOUNT, INITIAL_DATA_PATH};
+use crate::tasks::{INITIAL_DATA_PATH, REDUCE_TASKS_AMOUNT};
 use tokio::sync::mpsc::Sender;
 
 pub struct MainClient {
