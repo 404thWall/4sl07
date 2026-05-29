@@ -4,12 +4,10 @@ use crate::management_protocole::server::{OutMsg, ServerHandler};
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use tokio::sync::mpsc::Sender;
 
+use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
-
-pub const MAP_TASKS_AMOUNT: usize = 2;
-pub const REDUCE_TASKS_AMOUNT: usize = 8;
 
 static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));

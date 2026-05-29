@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use crate::management_protocole::client::{ClientHandler, start_client};
 use crate::management_protocole::file_transfer_protocole::file_client::FileClient;
-use crate::management_protocole::main_protocole::main_server;
 use crate::management_protocole::{Packet, ProtocolError, Task};
+use crate::tasks::REDUCE_TASKS_AMOUNT;
 use tokio::sync::mpsc::Sender;
 
 pub struct MainClient {
@@ -91,20 +91,28 @@ async fn do_task(
             let mut candidates = vec![];
             for path in paths {
                 let path = path.unwrap().path();
-                if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with("CC-MAIN-") {
+                if path.is_file()
+                    && path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .starts_with("CC-MAIN-")
+                {
                     candidates.push(path);
                 }
             }
             candidates.sort();
-            
+
             let path = candidates.get((key as usize) % candidates.len()).unwrap();
             println!("Starting Map task {} on file {}", key, path.display());
             let begin_time = std::time::Instant::now();
-            crate::tasks::run_map_task(path.to_str().unwrap(), main_server::REDUCE_TASKS_AMOUNT, key as usize).unwrap();
+            crate::tasks::run_map_task(path.to_str().unwrap(), REDUCE_TASKS_AMOUNT, key as usize)
+                .unwrap();
             println!("Finished Map task {} in {:?}", key, begin_time.elapsed());
 
             let mut reduce_files = vec![];
-            for i in 0..main_server::REDUCE_TASKS_AMOUNT {
+            for i in 0..REDUCE_TASKS_AMOUNT {
                 reduce_files.push(i as u32);
             }
 
@@ -127,7 +135,15 @@ async fn do_task(
                     println!("Connecting to worker at {}", addr);
                     let res: Result<(), ProtocolError> = start_client(
                         &addr,
-                        FileClient::new(Some(format!("./reduce_data/data_{}_{}", key, i)), key),
+                        FileClient::new(
+                            Some(format!(
+                                "{}data_{}_{}",
+                                crate::tasks::REDUCE_INITIAL_DATA_PATH,
+                                key,
+                                i
+                            )),
+                            key,
+                        ),
                     )
                     .await;
                     println!("Finished connecting to worker at {}: {:?}", addr, res);
@@ -136,10 +152,11 @@ async fn do_task(
                 println!("No connected clients");
             }
 
-            crate::tasks::run_reduce_task("./reduce_data/", key as usize).unwrap();
+            crate::tasks::run_reduce_task(crate::tasks::REDUCE_INITIAL_DATA_PATH, key as usize)
+                .unwrap();
             println!("Finished Reduce task {}", key);
 
-            let temp_data_folder = std::path::Path::new("./reduce_data/");
+            let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
             if temp_data_folder.exists() {
                 std::fs::remove_dir_all(temp_data_folder).ok();
             }

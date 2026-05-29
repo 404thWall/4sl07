@@ -44,7 +44,7 @@ impl ServerHandler for FileServer {
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
             Packet::AskMapResultFile(key) => {
-                let paths = std::fs::read_dir("./map_data/").unwrap();
+                let paths = std::fs::read_dir(crate::tasks::MAP_DATA_PATH).unwrap();
                 for path in paths {
                     let path = path.unwrap().path();
                     // Assuming files are named like "data_{reduce_key}_map_{map_key}"
