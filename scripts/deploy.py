@@ -151,7 +151,7 @@ def main() -> int:
 
     state = MachineState()
     state.update()
-    hosts = state.available()[: args.count]
+    hosts = state.available()[: args.count * 2]  # Get more hosts than needed in case some are taken while deploying
 
     if not hosts:
         print("No free machines available.", file=sys.stderr)
@@ -163,6 +163,12 @@ def main() -> int:
         if args.scp_only:
             log_execution(vars(args), status="success", session_id=session_id)
             return 0
+        
+    with open("deployed_hosts.txt", "r") as f:
+        existing_hosts = set(line.strip() for line in f if line.strip())
+        if args.append_hosts:
+            hosts = [host for host in hosts if host not in existing_hosts]
+    hosts = hosts[:args.count]
 
     mode = "a" if args.append_hosts else "w+"
     with open("deployed_hosts.txt", mode) as f:
