@@ -3,12 +3,16 @@ use rustc_hash::FxHashMap;
 use std::{
     fs::{self, File},
     hash::{DefaultHasher, Hash, Hasher},
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter}, path::Path,
 };
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
 /// This function simply saves the entire map to a single binary file, provided by the `save_path` arg.
 pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> std::io::Result<()> {
+    let path = Path::new(save_path);
+    let save_directory = path.parent().unwrap();
+    fs::create_dir_all(save_directory)?;
+
     let write_file = File::create(save_path)?;
     let writer = BufWriter::new(write_file);
 
