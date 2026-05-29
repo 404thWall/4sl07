@@ -76,7 +76,7 @@ def scp(user: str, host: str, file: Path) -> None:
 
 def ssh_run(user: str, hosts: list[str], file: Path, cmd: str | None = None) -> None:
     command = cmd if cmd else f"{REMOTE_PATH}{file.name}"
-    run_command_batch(["ssh", "{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07-{user} -d {command}"], user, hosts)
+    run_command_batch(["ssh", "{user}@{host}", f"chmod +x {REMOTE_PATH}{file.name} & tmux new -A -s 4sl07-{user} -d '{command}'"], user, hosts)
 
 
 def main() -> int:
