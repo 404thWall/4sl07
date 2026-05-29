@@ -15,7 +15,7 @@ pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> s
     //Serialize the FxHashMap directly into the file
     let e = bincode::serialize_into(writer, map);
     if e.is_err() {
-        eprintln!("Error writing : {:?}", e);
+        panic!("Error writing : {:?}", e);
     }
 
     Ok(())
@@ -40,7 +40,7 @@ pub fn save_one_map_r_files(
     }
 
     for (i, map_to_save) in maps.iter().enumerate().take(r) {
-        let save_path = format!("{save_directory}data_{i}_map{map_id}.mapdata");
+        let save_path = format!("{save_directory}data_{i}_map_{map_id}.mapdata");
         save_one_map_one_file(map_to_save, &save_path).unwrap();
     }
 
@@ -54,7 +54,7 @@ pub fn load_map(file_path: &str) -> std::io::Result<FxHashMap<String, u32>> {
 
     let loaded_map = bincode::deserialize_from(reader);
     if loaded_map.is_err() {
-        panic!("Load failed!")
+        panic!("Error loading : {:?}", loaded_map)
     }
 
     Ok(loaded_map.unwrap())
