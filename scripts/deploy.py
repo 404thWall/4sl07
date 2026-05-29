@@ -109,6 +109,12 @@ def main() -> int:
     
     parser.add_argument("--scp-only", action="store_true", 
                         help="Only scp the file to the first available machine, do not run it")
+    
+    parser.add_argument("--scp", action="store_true", default=True,
+                        help="Whether to scp the file to the machines (default: True)")
+
+    parser.add_argument("--no-scp", action="store_false", dest="scp",
+                        help="Do not scp the file to the machines, assume it is already there")
 
     args = parser.parse_args()
     session_id = log_execution(vars(args), status="running")
@@ -148,12 +154,12 @@ def main() -> int:
         print("No free machines available.", file=sys.stderr)
         return 1
 
-    print(f"[{hosts[0]}] scp...")
-    scp(args.user, hosts[0], args.file)
-
-    if args.scp_only:
-        log_execution(vars(args), status="success", session_id=session_id)
-        return 0
+    if args.scp:
+        print(f"[{hosts[0]}] scp...")
+        scp(args.user, hosts[0], args.file)
+        if args.scp_only:
+            log_execution(vars(args), status="success", session_id=session_id)
+            return 0
 
     with open("deployed_hosts.txt", "w+") as f:
         batch_size = 5
