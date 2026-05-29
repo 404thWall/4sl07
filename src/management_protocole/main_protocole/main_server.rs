@@ -8,8 +8,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
-pub const MAP_TASKS_AMOUNT: usize = 20;
-pub const REDUCE_TASKS_AMOUNT: usize = 4;
+pub const MAP_TASKS_AMOUNT: usize = 2;
+pub const REDUCE_TASKS_AMOUNT: usize = 8;
 
 static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));

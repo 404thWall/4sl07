@@ -83,9 +83,25 @@ async fn do_task(
     files_hosts: Vec<String>,
 ) {
     match task {
-        Task::Map(_key, _nkeys) => {
+        Task::Map(key, _nkeys) => {
             // Replace with actual map function
             tokio::time::sleep(Duration::from_secs(2)).await;
+
+            let paths = std::fs::read_dir("./data/").unwrap();
+            let mut candidates = vec![];
+            for path in paths {
+                let path = path.unwrap().path();
+                if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with("CC-MAIN-") {
+                    candidates.push(path);
+                }
+            }
+            candidates.sort();
+            
+            let path = candidates.get((key as usize) % candidates.len()).unwrap();
+            println!("Starting Map task {} on file {}", key, path.display());
+            let begin_time = std::time::Instant::now();
+            crate::tasks::run_map_task(path.to_str().unwrap(), main_server::REDUCE_TASKS_AMOUNT, key as usize).unwrap();
+            println!("Finished Map task {} in {:?}", key, begin_time.elapsed());
 
             let mut reduce_files = vec![];
             for i in 0..main_server::REDUCE_TASKS_AMOUNT {
@@ -120,8 +136,8 @@ async fn do_task(
                 println!("No connected clients");
             }
 
-            // Replace with actual reduce function
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            crate::tasks::run_reduce_task("./reduce_data/", key as usize).unwrap();
+            println!("Finished Reduce task {}", key);
 
             let temp_data_folder = std::path::Path::new("./reduce_data/");
             if temp_data_folder.exists() {
