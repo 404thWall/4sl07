@@ -104,7 +104,11 @@ def main() -> int:
 
     parser.add_argument("--save", action="store_true", default=True, 
                         help="Save settings for next time (default: True)")
+    
     parser.add_argument("--no-save", action="store_false", dest="save")
+    
+    parser.add_argument("--scp-only", action="store_true", 
+                        help="Only scp the file to the first available machine, do not run it")
 
     args = parser.parse_args()
     session_id = log_execution(vars(args), status="running")
@@ -146,6 +150,10 @@ def main() -> int:
 
     print(f"[{hosts[0]}] scp...")
     scp(args.user, hosts[0], args.file)
+
+    if args.scp_only:
+        log_execution(vars(args), status="success", session_id=session_id)
+        return 0
 
     with open("deployed_hosts.txt", "w+") as f:
         batch_size = 5
