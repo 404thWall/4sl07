@@ -128,8 +128,9 @@ pub fn test_result() -> std::io::Result<()> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
     for (i, file) in candidates.iter().enumerate().take(MAP_TASKS_AMOUNT) {
         if let Some(file_path) = file.file_name() {
-            println!("Starting {i}th map task");
-            map_file(file_path.to_str().unwrap(), &mut map).unwrap();
+            let name = file_path.to_str().unwrap();
+            println!("Starting {i}th map task : {name}");
+            map_file(name, &mut map).unwrap();
         } else {
             panic!("Failed to start the {i}th map task.")
         }
