@@ -143,10 +143,12 @@ pub fn test_result() -> std::io::Result<()> {
     reduce_directory(RESULT_PATH, &mut result_map).unwrap();
 
     for (key, value) in map.clone() {
+        println!("Testing : {key} / {value}");
         assert!(result_map.contains_key(&key));
         assert_eq!(value, *result_map.get(&key).unwrap());
     }
     for (key, value) in result_map {
+        println!("Testing : {key} / {value}");
         assert!(map.contains_key(&key));
         assert_eq!(value, *map.get(&key).unwrap());
     }
