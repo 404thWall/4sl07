@@ -7,7 +7,7 @@ use super::{INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, RESULT_PAT
 use rand::seq::SliceRandom;
 use rustc_hash::FxHashMap;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Instant;
 
@@ -173,6 +173,7 @@ pub fn test_result() -> std::io::Result<()> {
     );
 
     print!("Starting comparison of result map and manual map... ");
+    io::stdout().flush().unwrap();
     for (key, value) in map.clone() {
         assert!(
             result_map.contains_key(&key),
@@ -186,6 +187,7 @@ pub fn test_result() -> std::io::Result<()> {
         );
     }
     print!("50%... ");
+    io::stdout().flush().unwrap();
     for (key, value) in result_map {
         assert!(
             map.contains_key(&key),
@@ -213,7 +215,8 @@ pub fn test_all(
     let number_of_reduces = number_of_reduces.unwrap_or(REDUCE_TASKS_AMOUNT);
     let mut manual_map: FxHashMap<String, u32> = FxHashMap::default();
 
-    print!("Deleting previous files...");
+    print!("Deleting previous files... ");
+    io::stdout().flush().unwrap();
     let folder_to_delete = Path::new(MAP_DATA_PATH);
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
@@ -229,6 +232,7 @@ pub fn test_all(
     println!("Done.");
 
     print!("Fetching the list of files... ");
+    io::stdout().flush().unwrap();
     let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
     let mut candidates = vec![];
     for path in paths {
@@ -247,6 +251,7 @@ pub fn test_all(
     println!("Done.");
 
     print!("Selecting {number_of_splits} random splits to test...");
+    io::stdout().flush().unwrap();
     let mut rng = rand::rng();
     candidates.shuffle(&mut rng);
     println!("Done.");
@@ -255,9 +260,11 @@ pub fn test_all(
     for (i, file) in candidates.iter().enumerate().take(number_of_splits) {
         if let Some(file_path) = file.file_name() {
             let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
-            print!("Starting {i}th map task : {name}... ");
+            print!("Starting map task {i} : {name}... ");
+            io::stdout().flush().unwrap();
             map_file(&name, &mut manual_map).unwrap();
             print!("50%... ");
+            io::stdout().flush().unwrap();
             run_map_task(&name, number_of_reduces, i).unwrap();
             println!("Done.");
         } else {
@@ -269,12 +276,13 @@ pub fn test_all(
     print!(
         "Starting copying the outputs to temporary reduces folder (to simulate the exchange)... "
     );
+    io::stdout().flush().unwrap();
     for r in 0..number_of_reduces {
-        fs::create_dir_all(format!("/tmp/4sl07_grp3/tests/reduce{r}")).unwrap();
+        fs::create_dir_all(format!("/tmp/4sl07_grp3/tests/reduce{r}/")).unwrap();
         for i in 0..number_of_splits {
             fs::copy(
                 format!("/tmp/4sl07_grp3/map_data/data_{r}_map_{i}.mapdata"),
-                format!("/tmp/4sl07_grp3/reduce{r}/data_{r}_map_{i}.mapdata"),
+                format!("/tmp/4sl07_grp3/tests/reduce{r}/data_{r}_map_{i}.mapdata"),
             )
             .unwrap();
         }
@@ -284,17 +292,20 @@ pub fn test_all(
     println!("Starting reduce tasks...");
     for r in 0..number_of_reduces {
         print!("Starting {r}th reduce task... ");
-        run_reduce_task(&format!("/tmp/4sl07_grp3/reduce{r}/"), r).unwrap();
+        io::stdout().flush().unwrap();
+        run_reduce_task(&format!("/tmp/4sl07_grp3/tests/reduce{r}/"), r).unwrap();
         println!("Done.");
     }
     println!("Finished reduce tasks.");
 
     print!("Reforming the map from the results... ");
+    io::stdout().flush().unwrap();
     let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
     reduce_directory(RESULT_PATH, &mut result_map).unwrap();
     println!("Done.");
 
     print!("Starting comparison of result map and manual map... ");
+    io::stdout().flush().unwrap();
     for (key, value) in manual_map.clone() {
         assert!(
             result_map.contains_key(&key),
@@ -308,6 +319,7 @@ pub fn test_all(
         );
     }
     print!("50%... ");
+    io::stdout().flush().unwrap();
     for (key, value) in result_map {
         assert!(
             manual_map.contains_key(&key),
