@@ -4,7 +4,7 @@ mod saver;
 mod testing;
 pub use map::{run_map_task, run_map_task_default};
 pub use reduce::{run_reduce_task, run_reduce_task_default};
-pub use testing::{get_test_word_count_from_result, test_map, test_reduce, test_result};
+pub use testing::{get_test_word_count_from_result, test_all, test_map, test_reduce, test_result};
 
 #[derive(Copy, Clone)]
 struct TasksConfig {
@@ -39,7 +39,6 @@ const CONFIG: TasksConfig = TasksConfig {
     reduce_tasks_amount: 6,
 };
 
-pub const R: usize = 10;
 pub const INITIAL_DATA_PATH: &str = CONFIG.initial_data_path;
 pub const MAP_DATA_PATH: &str = CONFIG.map_data_path;
 pub const REDUCE_INITIAL_DATA_PATH: &str = CONFIG.reduce_initial_data_path;

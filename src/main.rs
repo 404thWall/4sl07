@@ -4,7 +4,8 @@ use slr07::management_protocole::file_transfer_protocole::file_client::FileClien
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
-    get_test_word_count_from_result, run_map_task_default, test_map, test_reduce, test_result,
+    get_test_word_count_from_result, run_map_task_default, test_all, test_map, test_reduce,
+    test_result,
 };
 use std::env;
 use std::time::Instant;
@@ -19,6 +20,7 @@ enum Mode {
     TestReduce,
     TestWordCount,
     TestResult,
+    TestAll,
 }
 
 #[tokio::main]
@@ -43,6 +45,8 @@ async fn main() {
             server = Mode::TestWordCount
         } else if args[1] == "testresult" {
             server = Mode::TestResult
+        } else if args[1] == "testall" {
+            server = Mode::TestAll
         }
     }
     let path = if args.len() < 2 {
@@ -156,6 +160,11 @@ async fn main() {
         Mode::TestResult => {
             println!("Testing the result from the deployement...");
             if let Err(e) = test_result() {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Mode::TestAll => {
+            if let Err(e) = test_all(None, None) {
                 eprintln!("Error: {}", e);
             }
         }

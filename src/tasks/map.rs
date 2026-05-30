@@ -1,4 +1,4 @@
-use crate::tasks::{MAP_DATA_PATH, R};
+use crate::tasks::{MAP_DATA_PATH, REDUCE_TASKS_AMOUNT};
 use rustc_hash::FxHashMap;
 
 //Faster than base HashMap
@@ -17,7 +17,7 @@ pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<()> 
 }
 
 pub fn run_map_task_default(path: &str) -> std::io::Result<()> {
-    run_map_task(path, R, 0)
+    run_map_task(path, REDUCE_TASKS_AMOUNT, 0)
 }
 
 pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result<()> {
