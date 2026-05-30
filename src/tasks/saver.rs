@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fs::{self, File},
     hash::{DefaultHasher, Hash, Hasher},
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Write},
     path::Path,
 };
 
@@ -15,13 +15,14 @@ pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> s
     fs::create_dir_all(save_directory)?;
 
     let write_file = File::create(save_path)?;
-    let writer = BufWriter::new(write_file);
+    let mut writer = BufWriter::new(write_file);
 
     //Serialize the FxHashMap directly into the file
-    let e = bincode::serialize_into(writer, map);
+    let e = bincode::serialize_into(&mut writer, map);
     if e.is_err() {
         panic!("Error writing : {:?}", e);
     }
+    writer.flush()?;
 
     Ok(())
 }
