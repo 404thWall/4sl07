@@ -172,16 +172,33 @@ pub fn test_result() -> std::io::Result<()> {
         result_map.keys().len()
     );
 
+    print!("Starting comparison of result map and manual map... ");
     for (key, value) in map.clone() {
-        println!("Testing : {key} / {value}");
-        assert!(result_map.contains_key(&key));
-        assert_eq!(value, *result_map.get(&key).unwrap());
+        assert!(
+            result_map.contains_key(&key),
+            "Result map did not contain key '{key}'"
+        );
+        assert_eq!(
+            value,
+            *result_map.get(&key).unwrap(),
+            "Result map had the wrong number of '{key}' : {} instead of {value}",
+            *result_map.get(&key).unwrap()
+        );
     }
+    print!("50%... ");
     for (key, value) in result_map {
-        println!("Testing : {key} / {value}");
-        assert!(map.contains_key(&key));
-        assert_eq!(value, *map.get(&key).unwrap());
+        assert!(
+            map.contains_key(&key),
+            "Manual map did not contain key '{key}'"
+        );
+        assert_eq!(
+            value,
+            *map.get(&key).unwrap(),
+            "Manual map had the wrong number of '{key}' : {} instead of {value}",
+            *map.get(&key).unwrap()
+        );
     }
+    println!("Done.");
 
     println!("Test passed successfully!");
 
