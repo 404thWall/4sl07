@@ -85,32 +85,50 @@ async fn do_task(
 ) {
     match task {
         Task::Map(key, _nkeys) => {
-            // Replace with actual map function
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
+            let map_result = tokio::task::spawn_blocking(move || {
+                let paths = std::fs::read_dir(INITIAL_DATA_PATH)?;
+                let mut candidates = vec![];
+                for path in paths {
+                    let path = path?.path();
+                    if path.is_file()
+                        && path
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .starts_with("CC-MAIN-")
+                    {
+                        candidates.push(path);
+                    }
+                }
+                candidates.sort();
 
-            let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
-            let mut candidates = vec![];
-            for path in paths {
-                let path = path.unwrap().path();
-                if path.is_file()
-                    && path
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .starts_with("CC-MAIN-")
-                {
-                    candidates.push(path);
+                let path = candidates
+                    .get((key as usize) % candidates.len())
+                    .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
+
+                println!("Starting Map task {} on file {}", key, path.display());
+                let begin_time = std::time::Instant::now();
+                crate::tasks::run_map_task(path.to_str().unwrap(), REDUCE_TASKS_AMOUNT, key as usize)?;
+                println!("Finished Map task {} in {:?}", key, begin_time.elapsed());
+                Ok::<(), std::io::Error>(())
+            })
+            .await;
+
+            match map_result {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    eprintln!("Map task {} failed: {}", key, e);
+                    tx.send(Packet::AskForTask).await.ok();
+                    return;
+                }
+                Err(e) => {
+                    eprintln!("Map task {} join error: {}", key, e);
+                    tx.send(Packet::AskForTask).await.ok();
+                    return;
                 }
             }
-            candidates.sort();
-
-            let path = candidates.get((key as usize) % candidates.len()).unwrap();
-            println!("Starting Map task {} on file {}", key, path.display());
-            let begin_time = std::time::Instant::now();
-            crate::tasks::run_map_task(path.to_str().unwrap(), REDUCE_TASKS_AMOUNT, key as usize)
-                .unwrap();
-            println!("Finished Map task {} in {:?}", key, begin_time.elapsed());
 
             let mut reduce_files = vec![];
             for i in 0..REDUCE_TASKS_AMOUNT {
@@ -153,13 +171,30 @@ async fn do_task(
                 println!("No connected clients");
             }
 
-            crate::tasks::run_reduce_task(crate::tasks::REDUCE_INITIAL_DATA_PATH, key as usize)
-                .unwrap();
-            println!("Finished Reduce task {}", key);
+            let reduce_result = tokio::task::spawn_blocking(move || {
+                crate::tasks::run_reduce_task(crate::tasks::REDUCE_INITIAL_DATA_PATH, key as usize)?;
+                println!("Finished Reduce task {}", key);
 
-            let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
-            if temp_data_folder.exists() {
-                std::fs::remove_dir_all(temp_data_folder).ok();
+                let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
+                if temp_data_folder.exists() {
+                    std::fs::remove_dir_all(temp_data_folder).ok();
+                }
+                Ok::<(), std::io::Error>(())
+            })
+            .await;
+
+            match reduce_result {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    eprintln!("Reduce task {} failed: {}", key, e);
+                    tx.send(Packet::AskForTask).await.ok();
+                    return;
+                }
+                Err(e) => {
+                    eprintln!("Reduce task {} join error: {}", key, e);
+                    tx.send(Packet::AskForTask).await.ok();
+                    return;
+                }
             }
             tx.send(Packet::TaskFinished {
                 task,
