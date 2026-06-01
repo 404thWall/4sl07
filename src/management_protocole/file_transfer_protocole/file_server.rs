@@ -54,7 +54,7 @@ impl ServerHandler for FileServer {
                             .unwrap()
                             .to_str()
                             .unwrap()
-                            .starts_with(&format!("data_{}", key))
+                            .starts_with(&format!("data_{}_", key))
                     {
                         println!("Found file for key {}: {}", key, path.display());
                         let mut file = File::open(&path)?;
