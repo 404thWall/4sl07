@@ -5,6 +5,7 @@ use crate::management_protocole::client::{ClientHandler, start_client};
 use crate::management_protocole::file_transfer_protocole::file_client::FileClient;
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use crate::tasks::{INITIAL_DATA_PATH, REDUCE_TASKS_AMOUNT};
+use futures::future::join_all;
 use tokio::sync::mpsc::Sender;
 
 pub struct MainClient {
@@ -86,6 +87,7 @@ async fn do_task(
     match task {
         Task::Map(key, _nkeys) => {
             // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
+            let begin_time = std::time::Instant::now();
             let map_result = tokio::task::spawn_blocking(move || {
                 let paths = std::fs::read_dir(INITIAL_DATA_PATH)?;
                 let mut candidates = vec![];
@@ -109,9 +111,7 @@ async fn do_task(
                     .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
                 println!("Starting Map task {} on file {}", key, path.display());
-                let begin_time = std::time::Instant::now();
                 crate::tasks::run_map_task(path.to_str().unwrap(), REDUCE_TASKS_AMOUNT, key as usize)?;
-                println!("Finished Map task {} in {:?}", key, begin_time.elapsed());
                 Ok::<(), std::io::Error>(())
             })
             .await;
@@ -128,19 +128,24 @@ async fn do_task(
                     tx.send(Packet::AskForTask).await.ok();
                     return;
                 }
-            }
+            };
 
             let mut reduce_files = vec![];
             for i in 0..REDUCE_TASKS_AMOUNT {
                 reduce_files.push(i as u32);
             }
 
-            tx.send(Packet::TaskFinished { task, reduce_files })
+            let elapsed_time = begin_time.elapsed();
+            println!("Finished Map task {} in {:?}", key, elapsed_time);
+            let elapsed_time_millis = elapsed_time.as_millis();
+
+            tx.send(Packet::TaskFinished { task, elapsed_time_millis, reduce_files })
                 .await
                 .ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::Reduce(key, _nkeys) => {
+            let begin_time = std::time::Instant::now();
             if let Some(clients) = connected_clients {
                 println!("Connected clients: {:?}", clients);
                 let map: HashMap<String, u16> = HashMap::from_iter(
@@ -200,8 +205,10 @@ async fn do_task(
                     return;
                 }
             }
+            let elapsed_time_millis = begin_time.elapsed().as_millis();
             tx.send(Packet::TaskFinished {
                 task,
+                elapsed_time_millis,
                 reduce_files: vec![],
             })
             .await

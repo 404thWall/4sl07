@@ -24,6 +24,7 @@ pub enum Packet {
     },
     TaskFinished {
         task: Task,
+        elapsed_time_millis: u128, // Time taken to complete the task in milliseconds
         reduce_files: Vec<u32>, // List of keys for which this task produced a file
     },
     AskMapResultFile(u32), // Ask for the files corresponding to the given Reduce key
@@ -144,11 +145,13 @@ impl Encoder<Packet> for CommandCodec {
             }
             Packet::TaskFinished {
                 task,
+                elapsed_time_millis,
                 reduce_files: resulting_files,
             } => {
                 payload.put_u8(0x06); // Message type: TaskFinished
                 encode_task(&task, &mut payload);
                 payload.put_u32(resulting_files.len() as u32);
+                payload.put_u128(elapsed_time_millis);
                 for key in resulting_files {
                     payload.put_u32(key);
                 }
@@ -250,21 +253,27 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
             let task = decode_task(payload)?;
             let size =
                 u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
-            if payload.len() < 13 + size * 4 {
+            let elapsed_time_millis = u128::from_be_bytes([
+                payload[13], payload[14], payload[15], payload[16], payload[17], payload[18],
+                payload[19], payload[20], payload[21], payload[22], payload[23], payload[24],
+                payload[25], payload[26], payload[27], payload[28],
+            ]);
+            if payload.len() < 29 + size * 4 {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
             let mut resulting_files = Vec::new();
             for i in 0..size {
                 let key = u32::from_be_bytes([
-                    payload[13 + i * 4],
-                    payload[14 + i * 4],
-                    payload[15 + i * 4],
-                    payload[16 + i * 4],
+                    payload[29 + i * 4],
+                    payload[30 + i * 4],
+                    payload[31 + i * 4],
+                    payload[32 + i * 4],
                 ]);
                 resulting_files.push(key);
             }
             Ok(Some(Packet::TaskFinished {
                 task,
+                elapsed_time_millis,
                 reduce_files: resulting_files,
             }))
         }

@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT};
 use std::collections::{HashMap, HashSet};
-use std::sync::LazyLock;
+use std::sync::{LazyLock, atomic};
 use tokio::sync::RwLock;
 
 static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
@@ -21,6 +21,8 @@ static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
 
 static MAP_RESULT_FILES: LazyLock<RwLock<HashMap<u32, HashSet<String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
+static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
 pub struct MainServer {
     ping_task: Option<tokio::task::JoinHandle<()>>,
@@ -135,8 +137,9 @@ impl ServerHandler for MainServer {
                 println!("Assigning task {:?} to {}", task, addr);
                 Ok(Some(Packet::GiveTask { task, files_hosts }))
             }
-            Packet::TaskFinished { task, reduce_files } => {
+            Packet::TaskFinished { task, elapsed_time_millis, reduce_files } => {
                 println!("Received TaskFinished from {} for task: {:?}", addr, task);
+                println!("Elapsed time (ms) for task {:?}: {}", task, elapsed_time_millis);
                 match task {
                     Task::Map(key, _) => {
                         let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
@@ -144,6 +147,7 @@ impl ServerHandler for MainServer {
                             println!("Task Map {} was already marked as finished, ignoring", key);
                         } else {
                             println!("Marking Task Map {} as finished", key);
+                            AVERAGE_ELAPSED_MAP_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
 
@@ -175,11 +179,20 @@ impl ServerHandler for MainServer {
                             );
                         } else {
                             println!("Marking Task Reduce {} as finished", key);
+                            AVERAGE_ELAPSED_REDUCE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
 
                             if tuple.1 == REDUCE_TASKS_AMOUNT as u32 {
+                                println!("===============================");
                                 println!("All Reduce tasks finished");
+                                println!("Average elapsed time (ms) for all map tasks: {}", 
+                                    AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst) / MAP_TASKS_AMOUNT as u64
+                                );
+                                println!("Average elapsed time (ms) for all reduce tasks: {}", 
+                                    AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst) / REDUCE_TASKS_AMOUNT as u64
+                                );
+                                println!("===============================");
                             }
                         }
                     }
