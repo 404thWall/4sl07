@@ -146,27 +146,31 @@ async fn do_task(
                 let map: HashMap<String, u16> = HashMap::from_iter(
                     clients.iter().map(|(addr, port)| (addr.to_string(), *port)),
                 );
+                let mut tasks = Vec::new();
                 for (i, addr) in files_hosts.iter().enumerate() {
                     let port = *map.get(addr).unwrap();
                     let addr = addr.split(":").next().unwrap_or("127.0.0.1").to_owned()
-                        + ":"
-                        + &port.to_string();
-                    println!("Connecting to worker at {}", addr);
-                    let res: Result<(), ProtocolError> = start_client(
-                        &addr,
-                        FileClient::new(
-                            Some(format!(
-                                "{}data_{}_{}",
-                                crate::tasks::REDUCE_INITIAL_DATA_PATH,
+                            + ":"
+                            + &port.to_string();
+                    tasks.push(tokio::spawn(async move {
+                        println!("Connecting to worker at {}", addr);
+                        let res: Result<(), ProtocolError> = start_client(
+                            &addr,
+                            FileClient::new(
+                                Some(format!(
+                                    "{}data_{}_{}",
+                                    crate::tasks::REDUCE_INITIAL_DATA_PATH,
+                                    key,
+                                    i
+                                )),
                                 key,
-                                i
-                            )),
-                            key,
-                        ),
-                    )
-                    .await;
-                    println!("Finished connecting to worker at {}: {:?}", addr, res);
+                            ),
+                        )
+                        .await;
+                        println!("Finished connecting to worker at {}: {:?}", addr, res);
+                    }));
                 }
+                join_all(tasks).await;
             } else {
                 println!("No connected clients");
             }
