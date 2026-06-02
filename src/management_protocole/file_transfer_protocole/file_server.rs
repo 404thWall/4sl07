@@ -1,3 +1,4 @@
+use crate::management_protocole::main_protocole::main_client;
 use crate::management_protocole::server::{OutMsg, ServerHandler};
 use crate::management_protocole::{Packet, ProtocolError};
 use std::fs::File;
@@ -57,6 +58,20 @@ impl ServerHandler for FileServer {
                             .starts_with(&format!("data_{}_", key))
                     {
                         println!("Found file for key {}: {}", key, path.display());
+                        println!("Test {}", path.file_name().unwrap().to_str().unwrap().split('.').nth(0).unwrap());
+                        println!("Test 2 {}", path.file_name().unwrap().to_str().unwrap().split('.').nth(0).unwrap().split('_').nth(3).unwrap());
+                        let map_id = path.file_name().unwrap().to_str().unwrap().split('.').nth(0).unwrap().split('_').nth(3).unwrap().parse::<u32>().unwrap();
+
+                        while !main_client::HANDLED_MAP_TASKS.read().unwrap().contains_key(&map_id) {
+                            println!("Waiting for map task {} to be validated...", map_id);
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        }
+
+                        if !main_client::HANDLED_MAP_TASKS.read().unwrap().get(&map_id).unwrap() {
+                            println!("Map task {} is not valid, skipping file...", map_id);
+                            continue;
+                        }
+
                         let mut file = File::open(&path)?;
                         let mut content = vec![0u8; 15 * 1024 * 1024];
                         let mut offset = 0;

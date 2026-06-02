@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 
 use crate::management_protocole::client::{ClientHandler, start_client};
@@ -8,10 +9,12 @@ use crate::tasks::{INITIAL_DATA_PATH, REDUCE_TASKS_AMOUNT};
 use futures::future::join_all;
 use tokio::sync::mpsc::Sender;
 
+pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
 pub struct MainClient {
     file_server_port: u16,
     connected_clients: Option<Vec<(String, u16)>>,
-    handled_map_tasks: HashMap<u32, bool>,
 }
 
 impl MainClient {
@@ -19,7 +22,6 @@ impl MainClient {
         MainClient {
             file_server_port,
             connected_clients: None,
-            handled_map_tasks: HashMap::new(),
         }
     }
 }
@@ -73,7 +75,7 @@ impl ClientHandler for MainClient {
             Packet::TaskValidation { validated, task } => {
                 match task {
                     Task::Map(key, _) => {
-                        self.handled_map_tasks.insert(key, validated);
+                        HANDLED_MAP_TASKS.write().unwrap().insert(key, validated);
                     }
                     _ => {}
                 }
