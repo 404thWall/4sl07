@@ -248,25 +248,7 @@ async fn do_task(
             println!("All tasks are finished, client is done!");
             println!("Sending all files to server...");
 
-            let command_str = format!("scp -r {} {}@{}:/tmp/4sl07_grp3/", 
-                crate::tasks::RESULT_PATH, 
-                user, 
-                host_address
-            );
-
-            if let Ok(c_command) = CString::new(command_str) {
-                unsafe {
-                    // Appelle directement le système pour lancer la commande via /bin/sh
-                    let status = libc::system(c_command.as_ptr());
-                    if status == 0 {
-                        println!("Succès !");
-                    } else {
-                        println!("Erreur lors de l'exécution de scp : {}", status);
-                    }
-                }
-            } else {
-                eprintln!("Erreur lors de la création de la commande scp");
-            }
+            send_result_files(user, host_address).await;
 
             println!("Cleaning up temporary files...");
             for path in crate::tasks::FOLDERS_TO_DELETE {
@@ -279,5 +261,38 @@ async fn do_task(
             println!("Exiting...");
             std::process::exit(0);
         }
+    }
+}
+
+async fn send_result_files(user: String, host_address: String) {
+    let mut tries= 0;
+    loop {
+        let command_str = format!("scp -r {} {}@{}:/tmp/4sl07_grp3/", 
+            crate::tasks::RESULT_PATH, 
+            user, 
+            host_address
+        );
+
+        if let Ok(c_command) = CString::new(command_str) {
+            unsafe {
+                // Appelle directement le système pour lancer la commande via /bin/sh
+                let status = libc::system(c_command.as_ptr());
+                if status == 0 {
+                    println!("Files successfully sent !");
+                    return;
+                } else {
+                    println!("Error executing scp: {}", status);
+                }
+            }
+        } else {
+            eprintln!("Error creating scp command");
+        }
+
+        tries += 1;
+        if tries >= 10 {
+            eprintln!("Failed after 10 attempts, giving up.");
+            return;
+        }
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
