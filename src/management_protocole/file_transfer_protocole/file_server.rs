@@ -58,29 +58,6 @@ impl ServerHandler for FileServer {
                             .starts_with(&format!("data_{}_", key))
                     {
                         println!("Found file for key {}: {}", key, path.display());
-                        println!(
-                            "Test {}",
-                            path.file_name()
-                                .unwrap()
-                                .to_str()
-                                .unwrap()
-                                .split('.')
-                                .nth(0)
-                                .unwrap()
-                        );
-                        println!(
-                            "Test 2 {}",
-                            path.file_name()
-                                .unwrap()
-                                .to_str()
-                                .unwrap()
-                                .split('.')
-                                .nth(0)
-                                .unwrap()
-                                .split('_')
-                                .nth(3)
-                                .unwrap()
-                        );
                         let map_id = path
                             .file_name()
                             .unwrap()
