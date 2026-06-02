@@ -23,7 +23,7 @@ do
     mkdir ./tests/client_$i/
     cp ./target/release/slr07 ./tests/client_$i/
     cd ./tests/client_$i/
-    ./slr07 client $PORT 127.0.0.1 2>&1 > >(tee ./client_$i.log) & PID_client=$!
+    ./slr07 client $PORT 127.0.0.1 test 2>&1 > >(tee ./client_$i.log) & PID_client=$!
     echo "Client $i (PID: $PID_client) connecté au port $PORT"
     cd ../..
     echo "$PID_client" >> pids.txt

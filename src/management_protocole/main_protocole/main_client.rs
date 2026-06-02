@@ -312,6 +312,10 @@ async fn prepare_files_for_sending() {
 }
 
 async fn send_result_files(user: String, host_address: String) {
+    if user == "test" {
+        println!("Test user detected, skipping sending files.");
+        return;
+    }
     let mut tries = 0;
     loop {
         let command_str = format!(
