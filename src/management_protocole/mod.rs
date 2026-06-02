@@ -46,6 +46,7 @@ pub enum Packet {
 pub enum Task {
     None,
     Finished,
+    SaveFiles,
     Map(u32, u32),    // Contains the key and the number of keys for this task
     Reduce(u32, u32), // Contains the key and the number of keys for this task
 }
@@ -394,6 +395,11 @@ fn encode_task(task: &Task, payload: &mut BytesMut) {
             payload.put_u32(0);
             payload.put_u32(0);
         }
+        Task::SaveFiles => {
+            payload.put_u8(0x04);
+            payload.put_u32(0);
+            payload.put_u32(0);
+        }
     }
 }
 
@@ -416,6 +422,7 @@ fn decode_task(payload: &[u8]) -> Result<Task, ProtocolError> {
         0x01 => Ok(Task::Map(key, nkeys)),
         0x02 => Ok(Task::Reduce(key, nkeys)),
         0x03 => Ok(Task::Finished),
+        0x04 => Ok(Task::SaveFiles),
         _ => Err(ProtocolError::UnexpectedPacketFormat(format!(
             "Invalid task type: {}",
             task_type

@@ -21,6 +21,9 @@ static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
 
 static MAP_RESULT_FILES: LazyLock<RwLock<HashMap<u32, HashSet<String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
+    LazyLock::new(|| RwLock::new(HashSet::new()));
+
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
@@ -97,10 +100,17 @@ impl ServerHandler for MainServer {
                 println!("Received AskForTask from {}", addr);
                 let mut queue = TASK_QUEUE.write().await;
                 if queue.is_empty() {
-                    if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
-                        println!("All tasks are finished, sending None to {}", addr);
+                    if RESULT_FILES_SENT.read().await.len() == CONNECTED_FILE_PORT.read().await.len() {
+                        println!("All result files have been sent, sending Finished task to {}", addr);
                         return Ok(Some(Packet::GiveTask {
                             task: Task::Finished,
+                            files_hosts: Vec::new(),
+                        }));
+                    }
+                    if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
+                        println!("All tasks are finished, sending SaveFiles to {}", addr);
+                        return Ok(Some(Packet::GiveTask {
+                            task: Task::SaveFiles,
                             files_hosts: Vec::new(),
                         }));
                     }

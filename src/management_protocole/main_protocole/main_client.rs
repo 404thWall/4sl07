@@ -260,13 +260,15 @@ async fn do_task(
             tokio::time::sleep(Duration::from_secs(1)).await;
             tx.send(Packet::AskForTask).await.ok();
         }
-        Task::Finished => {
-            println!("All tasks are finished, client is done!");
-            println!("Sending all files to server...");
-
+        Task::SaveFiles => {
+            println!("Received SaveFiles task, preparing files for sending...");
             prepare_files_for_sending().await;
             send_result_files(user, host_address).await;
-
+            println!("Finished SaveFiles task, asking for next task...");
+            tx.send(Packet::AskForTask).await.ok();
+        }
+        Task::Finished => {
+            println!("All tasks are finished, client is done!");
             println!("Cleaning up temporary files...");
             for path in crate::tasks::FOLDERS_TO_DELETE {
                 let temp_data_folder: &std::path::Path = std::path::Path::new(path);
