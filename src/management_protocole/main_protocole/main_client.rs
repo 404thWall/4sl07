@@ -264,6 +264,7 @@ async fn do_task(
             println!("All tasks are finished, client is done!");
             println!("Sending all files to server...");
 
+            prepare_files_for_sending().await;
             send_result_files(user, host_address).await;
 
             println!("Cleaning up temporary files...");
@@ -276,6 +277,36 @@ async fn do_task(
             }
             println!("Exiting...");
             std::process::exit(0);
+        }
+    }
+}
+
+async fn prepare_files_for_sending() {
+    let paths = std::fs::read_dir(crate::tasks::RESULT_PATH).unwrap();
+    for path in paths {
+        let path = path.unwrap();
+        
+        // Assuming files are named like "result_{reduce_key}.mapdata"
+        let id = path
+            .file_name()
+            .to_str()
+            .unwrap()
+            .split('.')
+            .nth(0)
+            .unwrap()
+            .split('_')
+            .nth(1)
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        
+        while !HANDLED_REDUCE_TASKS.read().unwrap().contains_key(&id) {
+            println!("Waiting for reduce task {} to be validated...", id);
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        if !HANDLED_REDUCE_TASKS.read().unwrap().get(&id).unwrap() {
+            println!("Reduce task {} was not validated, deleting file...", id);
+            std::fs::remove_file(path.path()).ok();
         }
     }
 }
