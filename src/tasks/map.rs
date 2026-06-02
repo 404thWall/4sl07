@@ -24,6 +24,8 @@ pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
 
+    let mut skip_first_body: bool = true;
+
     // Parsing buffers :
     let mut line = String::new();
     let mut chunk_bytes: Vec<u8> = Vec::with_capacity(5000);
@@ -68,9 +70,13 @@ pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result
             .read_exact(&mut chunk_bytes[..total_to_read])
             .unwrap();
 
-        let contents: &mut str =
-            str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
-        map_single_chunk(contents, map).unwrap();
+        if !skip_first_body {
+            let contents: &mut str =
+                str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
+            map_single_chunk(contents, map).unwrap();
+        } else {
+            skip_first_body = false;
+        }
     }
     Ok(())
 }
