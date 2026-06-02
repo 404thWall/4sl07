@@ -20,15 +20,14 @@ struct Args {
 enum Commands {
     Server,
     Client {
-        #[arg(short, long, default_value_t = 9001)]
+        #[arg(default_value_t = 9001)]
         file_server_port: u16,
-        #[arg(short, long, default_value = "127.0.0.1")]
+        #[arg(default_value = "127.0.0.1")]
         main_host_address: String,
     },
     FileTransferServer,
     FileTransferClient,
     Map {
-        #[arg(short, long)]
         /// Path to the _file_ to map.
         path: String,
         #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
@@ -36,29 +35,24 @@ enum Commands {
         /// Allows the map task to create `reduce_number` files
         /// containing the relevant keys for each reduce task.
         reduce_number: usize,
-        #[arg(short, long)]
         /// The id of the map task.
         map_id: usize,
     },
     Reduce {
-        #[arg(short, long)]
         /// Path to the _directory_ to reduce. Must end in a '/'.
         path: String,
-        #[arg(short, long)]
         /// The id of the reduce task.
         reduce_id: usize,
     },
     TestMap {
-        #[arg(short, long)]
         /// Path to the _file_ to evaluate the map performance on.
         path: String,
-        #[arg(short, long)]
+        #[arg(short, long, default_value_t = 20)]
         /// Number of times both implementations will be ran. Used to
         /// reduce randomness at the cost of computing time.
         number_of_tests: u32,
     },
     TestReduce {
-        #[arg(short, long)]
         /// Path to the _file_ to map. After the map is complete,
         /// the mapped files will be reduced, and the result will
         /// be tested.
@@ -76,7 +70,6 @@ enum Commands {
         number_of_reduces: usize,
     },
     GetWordCount {
-        #[arg(short, long)]
         /// Path to the result _directory_ from which we want to get the
         /// word count of the word `word`.
         path: String,
