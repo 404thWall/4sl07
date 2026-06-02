@@ -1,5 +1,8 @@
 #!/bin/bash
 
+line=$(head -n 1 pids.txt)
+kill $line
+
 rm -rf ./tests/client_*/
 rm -rf ./tests/server/
 rm -rf ./tests/result/
