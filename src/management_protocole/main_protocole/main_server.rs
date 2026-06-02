@@ -145,11 +145,14 @@ impl ServerHandler for MainServer {
                         let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
                         if tuple.0[key as usize] {
                             println!("Task Map {} was already marked as finished, ignoring", key);
+                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation { validated: false, task })).await.ok();
                         } else {
                             println!("Marking Task Map {} as finished", key);
                             AVERAGE_ELAPSED_MAP_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
+                            let count = tuple.1;
+                            drop(tuple);
 
                             println!(
                                 "Storing resulting files for Map task {}: {:?}",
@@ -164,7 +167,9 @@ impl ServerHandler for MainServer {
                                 }
                             }
 
-                            if tuple.1 == MAP_TASKS_AMOUNT as u32 {
+                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation { validated: true,task })).await.ok();
+
+                            if count == MAP_TASKS_AMOUNT as u32 {
                                 println!("All Map tasks finished, generating Reduce tasks...");
                                 generate_reduce_tasks().await;
                             }
@@ -177,13 +182,18 @@ impl ServerHandler for MainServer {
                                 "Task Reduce {} was already marked as finished, ignoring",
                                 key
                             );
+                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation { validated: false,task })).await.ok();
                         } else {
                             println!("Marking Task Reduce {} as finished", key);
                             AVERAGE_ELAPSED_REDUCE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
                             tuple.0[key as usize] = true;
                             tuple.1 += 1;
+                            let count = tuple.1;
+                            drop(tuple);
 
-                            if tuple.1 == REDUCE_TASKS_AMOUNT as u32 {
+                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation { validated: true,task })).await.ok();
+
+                            if count == REDUCE_TASKS_AMOUNT as u32 {
                                 println!("===============================");
                                 println!("All Reduce tasks finished");
                                 println!("Average elapsed time (ms) for all map tasks: {}", 

@@ -27,6 +27,10 @@ pub enum Packet {
         elapsed_time_millis: u128, // Time taken to complete the task in milliseconds
         reduce_files: Vec<u32>, // List of keys for which this task produced a file
     },
+    TaskValidation {
+        validated: bool, // Whether the task result was validated successfully
+        task: Task,
+    },
     AskMapResultFile(u32), // Ask for the files corresponding to the given Reduce key
     MapResultFile {
         end_offset: u64,  // The offset in the file after the content sent in this packet
@@ -189,6 +193,11 @@ impl Encoder<Packet> for CommandCodec {
             Packet::AllFilesSent => {
                 payload.put_u8(0x0B); // Message type: AllFilesSent
             }
+            Packet::TaskValidation {validated,  task } => {
+                payload.put_u8(0x0C); // Message type: TaskValidated
+                payload.put_u8(if validated { 1 } else { 0 });
+                encode_task(&task, &mut payload);
+            }
         }
 
         // Write length-prefixed message
@@ -341,6 +350,11 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         }
         0x0A => Ok(Some(Packet::AskWorkersList)),
         0x0B => Ok(Some(Packet::AllFilesSent)),
+        0x0C => {
+            let validated = payload[0] != 0;
+            let task = decode_task(&payload[1..])?;
+            Ok(Some(Packet::TaskValidation { validated, task }))
+        }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }
 }

@@ -11,6 +11,7 @@ use tokio::sync::mpsc::Sender;
 pub struct MainClient {
     file_server_port: u16,
     connected_clients: Option<Vec<(String, u16)>>,
+    handled_map_tasks: HashMap<u32, bool>,
 }
 
 impl MainClient {
@@ -18,6 +19,7 @@ impl MainClient {
         MainClient {
             file_server_port,
             connected_clients: None,
+            handled_map_tasks: HashMap::new(),
         }
     }
 }
@@ -66,6 +68,15 @@ impl ClientHandler for MainClient {
             Packet::ConnectedWorkersList(list) => {
                 println!("Received ConnectedWorkersList with list: {:?}", list);
                 self.connected_clients = Some(list);
+                Ok(None)
+            }
+            Packet::TaskValidation { validated, task } => {
+                match task {
+                    Task::Map(key, _) => {
+                        self.handled_map_tasks.insert(key, validated);
+                    }
+                    _ => {}
+                }
                 Ok(None)
             }
             p => Err(ProtocolError::UnexpectedPacket(p)),
