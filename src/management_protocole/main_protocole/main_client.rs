@@ -12,6 +12,8 @@ use tokio::sync::mpsc::Sender;
 
 pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+pub static HANDLED_REDUCE_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub struct MainClient {
     file_server_port: u16,
@@ -85,6 +87,9 @@ impl ClientHandler for MainClient {
                 match task {
                     Task::Map(key, _) => {
                         HANDLED_MAP_TASKS.write().unwrap().insert(key, validated);
+                    }
+                    Task::Reduce(key, _) => {
+                        HANDLED_REDUCE_TASKS.write().unwrap().insert(key, validated);
                     }
                     _ => {}
                 }
