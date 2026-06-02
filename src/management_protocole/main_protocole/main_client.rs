@@ -15,13 +15,17 @@ pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
 pub struct MainClient {
     file_server_port: u16,
     connected_clients: Option<Vec<(String, u16)>>,
+    user: String,
+    host_address: String,
 }
 
 impl MainClient {
-    pub fn new(file_server_port: u16) -> Self {
+    pub fn new(file_server_port: u16, user: String, host_address: String) -> Self {
         MainClient {
             file_server_port,
             connected_clients: None,
+            user,
+            host_address,
         }
     }
 }
@@ -54,6 +58,8 @@ impl ClientHandler for MainClient {
                 );
                 let connected_clients = self.connected_clients.clone();
                 let file_server_port = self.file_server_port;
+                let user = self.user.clone();
+                let host_address = self.host_address.clone();
                 tokio::spawn(async move {
                     do_task(
                         task,
@@ -61,6 +67,8 @@ impl ClientHandler for MainClient {
                         connected_clients,
                         file_server_port,
                         files_hosts,
+                        user,
+                        host_address,
                     )
                     .await;
                 });
@@ -96,6 +104,8 @@ async fn do_task(
     connected_clients: Option<Vec<(String, u16)>>,
     _file_server_port: u16,
     files_hosts: Vec<String>,
+    user: String,
+    host_address: String,
 ) {
     match task {
         Task::Map(key, _nkeys) => {
@@ -235,6 +245,25 @@ async fn do_task(
         }
         Task::Finished => {
             println!("All tasks are finished, client is done!");
+            println!("Sending all files to server...");
+
+            let status = std::process::Command::new("scp")
+                .arg("-r")
+                .arg(crate::tasks::RESULT_PATH)
+                .arg(format!("{}@{}:/tmp/4sl07_grp3/", user, host_address))
+                .status();
+            match status {
+                Ok(s) if s.success() => {
+                    println!("Files sent successfully!");
+                }
+                Ok(s) => {
+                    eprintln!("Failed to send files, scp exited with status: {}", s);
+                }
+                Err(e) => {
+                    eprintln!("Failed to send files, scp error: {}", e);
+                }
+            }
+
             println!("Cleaning up temporary files...");
             for path in crate::tasks::FOLDERS_TO_DELETE {
                 let temp_data_folder: &std::path::Path = std::path::Path::new(path);

@@ -24,6 +24,7 @@ enum Commands {
         file_server_port: u16,
         #[arg(default_value = "127.0.0.1")]
         main_host_address: String,
+        user: String,
     },
     FileTransferServer,
     FileTransferClient,
@@ -95,6 +96,7 @@ async fn main() {
         Commands::Client {
             file_server_port,
             main_host_address,
+            user, 
         } => {
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
@@ -109,9 +111,10 @@ async fn main() {
             });
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             println!("Starting main client...");
+            let copied_address = main_host_address.clone();
             if let Err(e) = management_protocole::client::start_client(
                 &format!("{}:9000", main_host_address),
-                MainClient::new(file_server_port),
+                MainClient::new(file_server_port, user, copied_address),
             )
             .await
             {
