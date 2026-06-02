@@ -23,7 +23,11 @@ const CONFIG: TasksConfig = TasksConfig {
     map_data_path: "/tmp/4sl07_grp3/map_data/",
     reduce_initial_data_path: "/tmp/4sl07_grp3/to_reduce/",
     result_path: "/tmp/4sl07_grp3/result/",
-    folders_to_delete: &["/tmp/4sl07_grp3/result", "/tmp/4sl07_grp3/map_data/", "/tmp/4sl07_grp3/to_reduce/"],
+    folders_to_delete: &[
+        "/tmp/4sl07_grp3/result",
+        "/tmp/4sl07_grp3/map_data/",
+        "/tmp/4sl07_grp3/to_reduce/",
+    ],
     map_tasks_amount: 250,
     reduce_tasks_amount: 42,
 };

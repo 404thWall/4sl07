@@ -135,7 +135,11 @@ async fn do_task(
                     .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
                 println!("Starting Map task {} on file {}", key, path.display());
-                crate::tasks::run_map_task(path.to_str().unwrap(), REDUCE_TASKS_AMOUNT, key as usize)?;
+                crate::tasks::run_map_task(
+                    path.to_str().unwrap(),
+                    REDUCE_TASKS_AMOUNT,
+                    key as usize,
+                )?;
                 Ok::<(), std::io::Error>(())
             })
             .await;
@@ -163,9 +167,13 @@ async fn do_task(
             println!("Finished Map task {} in {:?}", key, elapsed_time);
             let elapsed_time_millis = elapsed_time.as_millis();
 
-            tx.send(Packet::TaskFinished { task, elapsed_time_millis, reduce_files })
-                .await
-                .ok();
+            tx.send(Packet::TaskFinished {
+                task,
+                elapsed_time_millis,
+                reduce_files,
+            })
+            .await
+            .ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::Reduce(key, _nkeys) => {
@@ -179,8 +187,8 @@ async fn do_task(
                 for (i, addr) in files_hosts.iter().enumerate() {
                     let port = *map.get(addr).unwrap();
                     let addr = addr.split(":").next().unwrap_or("127.0.0.1").to_owned()
-                            + ":"
-                            + &port.to_string();
+                        + ":"
+                        + &port.to_string();
                     tasks.push(tokio::spawn(async move {
                         println!("Connecting to worker at {}", addr);
                         let res: Result<(), ProtocolError> = start_client(
@@ -205,7 +213,10 @@ async fn do_task(
             }
 
             let reduce_result = tokio::task::spawn_blocking(move || {
-                crate::tasks::run_reduce_task(crate::tasks::REDUCE_INITIAL_DATA_PATH, key as usize)?;
+                crate::tasks::run_reduce_task(
+                    crate::tasks::REDUCE_INITIAL_DATA_PATH,
+                    key as usize,
+                )?;
                 println!("Finished Reduce task {}", key);
 
                 let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
@@ -265,11 +276,12 @@ async fn do_task(
 }
 
 async fn send_result_files(user: String, host_address: String) {
-    let mut tries= 0;
+    let mut tries = 0;
     loop {
-        let command_str = format!("scp -r {} {}@{}:/tmp/4sl07_grp3/", 
-            crate::tasks::RESULT_PATH, 
-            user, 
+        let command_str = format!(
+            "scp -r {} {}@{}:/tmp/4sl07_grp3/",
+            crate::tasks::RESULT_PATH,
+            user,
             host_address
         );
 

@@ -25,7 +25,7 @@ pub enum Packet {
     TaskFinished {
         task: Task,
         elapsed_time_millis: u128, // Time taken to complete the task in milliseconds
-        reduce_files: Vec<u32>, // List of keys for which this task produced a file
+        reduce_files: Vec<u32>,    // List of keys for which this task produced a file
     },
     TaskValidation {
         validated: bool, // Whether the task result was validated successfully
@@ -193,7 +193,7 @@ impl Encoder<Packet> for CommandCodec {
             Packet::AllFilesSent => {
                 payload.put_u8(0x0B); // Message type: AllFilesSent
             }
-            Packet::TaskValidation {validated,  task } => {
+            Packet::TaskValidation { validated, task } => {
                 payload.put_u8(0x0C); // Message type: TaskValidated
                 payload.put_u8(if validated { 1 } else { 0 });
                 encode_task(&task, &mut payload);
@@ -263,9 +263,22 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
             let size =
                 u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
             let elapsed_time_millis = u128::from_be_bytes([
-                payload[13], payload[14], payload[15], payload[16], payload[17], payload[18],
-                payload[19], payload[20], payload[21], payload[22], payload[23], payload[24],
-                payload[25], payload[26], payload[27], payload[28],
+                payload[13],
+                payload[14],
+                payload[15],
+                payload[16],
+                payload[17],
+                payload[18],
+                payload[19],
+                payload[20],
+                payload[21],
+                payload[22],
+                payload[23],
+                payload[24],
+                payload[25],
+                payload[26],
+                payload[27],
+                payload[28],
             ]);
             if payload.len() < 29 + size * 4 {
                 return Err(ProtocolError::InvalidMessageType(msg_type));

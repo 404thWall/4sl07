@@ -96,7 +96,7 @@ async fn main() {
         Commands::Client {
             file_server_port,
             main_host_address,
-            user, 
+            user,
         } => {
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
