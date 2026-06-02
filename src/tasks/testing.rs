@@ -11,7 +11,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Instant;
 
-static WORD_TO_TEST: &str = "the";
+const WORD_TO_TEST: &str = "the";
 
 /// Evaluates the performance of the current Map task implementation.
 /// It is compared to the naive approach of neglecting the headers and just parsing the entire file.
@@ -93,19 +93,22 @@ pub fn test_reduce(path: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn get_test_word_count_from_result(result_directory_path: &str) -> std::io::Result<u32> {
+pub fn get_test_word_count_from_result(
+    result_directory_path: &str,
+    word_to_test: &str,
+) -> std::io::Result<u32> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
     reduce_directory(result_directory_path, &mut map).unwrap();
 
-    if let Some(count) = map.get(WORD_TO_TEST) {
+    if let Some(count) = map.get(word_to_test) {
         println!(
-            "The word '{WORD_TO_TEST}' was present {} times in the result!",
+            "The word '{word_to_test}' was present {} times in the result!",
             count
         );
         return Ok(*count);
     }
 
-    println!("The word '{WORD_TO_TEST}' was not present in the result...");
+    println!("The word '{word_to_test}' was not present in the result...");
 
     Ok(0)
 }

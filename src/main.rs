@@ -1,72 +1,97 @@
+use clap::{Parser, Subcommand};
 use management_protocole::main_protocole::main_client::MainClient;
 use slr07::management_protocole;
 use slr07::management_protocole::file_transfer_protocole::file_client::FileClient;
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
-    get_test_word_count_from_result, run_map_task_default, test_all, test_map, test_reduce,
-    test_result,
+    MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, get_test_word_count_from_result, run_map_task,
+    run_reduce_task, test_all, test_map, test_reduce, test_result,
 };
-use std::env;
-use std::time::Instant;
 
-enum Mode {
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    cmd: Commands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum Commands {
     Server,
-    Client,
-    FileReader,
+    Client {
+        #[arg(short, long, default_value_t = 9001)]
+        file_server_port: u16,
+        #[arg(short, long, default_value = "127.0.0.1")]
+        main_host_address: String,
+    },
     FileTransferServer,
     FileTransferClient,
-    TestMap,
-    TestReduce,
-    TestWordCount,
+    Map {
+        #[arg(short, long)]
+        /// Path to the _file_ to map.
+        path: String,
+        #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
+        /// Indicates the number of reduce tasks that will be run. \
+        /// Allows the map task to create `reduce_number` files
+        /// containing the relevant keys for each reduce task.
+        reduce_number: usize,
+        #[arg(short, long)]
+        /// The id of the map task.
+        map_id: usize,
+    },
+    Reduce {
+        #[arg(short, long)]
+        /// Path to the _directory_ to reduce. Must end in a '/'.
+        path: String,
+        #[arg(short, long)]
+        /// The id of the reduce task.
+        reduce_id: usize,
+    },
+    TestMap {
+        #[arg(short, long)]
+        /// Path to the _file_ to evaluate the map performance on.
+        path: String,
+        #[arg(short, long)]
+        /// Number of times both implementations will be ran. Used to
+        /// reduce randomness at the cost of computing time.
+        number_of_tests: u32,
+    },
+    TestReduce {
+        #[arg(short, long)]
+        /// Path to the _file_ to map. After the map is complete,
+        /// the mapped files will be reduced, and the result will
+        /// be tested.
+        path: String,
+    },
     TestResult,
-    TestAll,
+    /// Chooses `number_of_maps` random splits from the default directory
+    /// and maps them into `number_of_reduces` files. Theses mapped files
+    /// are then reduced, and a test to check the integrity of the result
+    /// files is then ran.
+    TestAll {
+        #[arg(short, long, default_value_t = MAP_TASKS_AMOUNT)]
+        number_of_maps: usize,
+        #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
+        number_of_reduces: usize,
+    },
+    GetWordCount {
+        #[arg(short, long)]
+        /// Path to the result _directory_ from which we want to get the
+        /// word count of the word `word`.
+        path: String,
+        #[arg(short, long, default_value = "the")]
+        /// Word that we want to have the number of in the results. \
+        /// Should be in lowercase.
+        word: String,
+    },
 }
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut server = Mode::FileReader;
-
-    if args.len() >= 2 {
-        if args[1] == "server" {
-            server = Mode::Server;
-        } else if args[1] == "client" {
-            server = Mode::Client;
-        } else if args[1] == "file_transfer_server" {
-            server = Mode::FileTransferServer;
-        } else if args[1] == "file_transfer_client" {
-            server = Mode::FileTransferClient;
-        } else if args[1] == "testmap" {
-            server = Mode::TestMap;
-        } else if args[1] == "testreduce" {
-            server = Mode::TestReduce
-        } else if args[1] == "testwordcount" {
-            server = Mode::TestWordCount
-        } else if args[1] == "testresult" {
-            server = Mode::TestResult
-        } else if args[1] == "testall" {
-            server = Mode::TestAll
-        }
-    }
-    let path = if args.len() < 2 {
-        "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
-    } else if args.len() == 2 {
-        if (args[1] == "testmap") || (args[1] == "testreduce") || (args[1] == "testwordcount") {
-            "/cal/commoncrawl/CC-MAIN-20230321002050-20230321032050-00486.warc.wet"
-        } else {
-            &args[1]
-        }
-    } else if args.len() == 3
-        && ((args[1] == "testmap") || (args[1] == "testreduce") || (args[1] == "testwordcount"))
-    {
-        &args[2]
-    } else {
-        ""
-    };
-
-    match server {
-        Mode::Server => {
+    let args = Args::parse();
+    match args.cmd {
+        Commands::Server => {
             println!("Starting in server mode...");
             if let Err(e) =
                 management_protocole::server::start_server("0.0.0.0:9000", MainServer::new()).await
@@ -74,18 +99,10 @@ async fn main() {
                 eprintln!("Server error: {}", e);
             }
         }
-        Mode::Client => {
-            println!("Starting in client mode...");
-            let file_server_port = if args.len() >= 3 {
-                args[2].parse::<u16>().unwrap_or(9001)
-            } else {
-                9001
-            };
-            let main_host = if args.len() >= 4 {
-                args[3].clone()
-            } else {
-                "127.0.0.1".to_string()
-            };
+        Commands::Client {
+            file_server_port,
+            main_host_address,
+        } => {
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
                 if let Err(e) = management_protocole::server::start_server(
@@ -100,7 +117,7 @@ async fn main() {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             println!("Starting main client...");
             if let Err(e) = management_protocole::client::start_client(
-                &format!("{}:9000", main_host),
+                &format!("{}:9000", main_host_address),
                 MainClient::new(file_server_port),
             )
             .await
@@ -108,18 +125,7 @@ async fn main() {
                 eprintln!("Client error: {}", e);
             }
         }
-        Mode::FileReader => {
-            println!("Starting in file reader mode...");
-            let start = Instant::now();
-            if let Err(e) = run_map_task_default(path) {
-                eprintln!("Error: {}", e);
-            }
-            println!(
-                "Program finished! It took {:}s to run.",
-                start.elapsed().as_secs_f64()
-            );
-        }
-        Mode::FileTransferClient => {
+        Commands::FileTransferClient => {
             println!("Starting in file transfer client mode...");
             if let Err(e) = management_protocole::client::start_client(
                 //"137.194.140.198:9001",
@@ -131,7 +137,7 @@ async fn main() {
                 eprintln!("File transfer client error: {}", e);
             }
         }
-        Mode::FileTransferServer => {
+        Commands::FileTransferServer => {
             println!("Starting in file transfer server mode..");
             if let Err(e) =
                 management_protocole::server::start_server("0.0.0.0:9001", FileServer::new()).await
@@ -139,32 +145,54 @@ async fn main() {
                 eprintln!("File transfer server error: {}", e);
             }
         }
-        Mode::TestMap => {
+        Commands::Map {
+            path,
+            reduce_number,
+            map_id,
+        } => {
+            println!("Running the Map Task...");
+            if let Err(e) = run_map_task(&path, reduce_number, map_id) {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Commands::Reduce { path, reduce_id } => {
+            println!("Running the Reduce Task...");
+            if let Err(e) = run_reduce_task(&path, reduce_id) {
+                eprintln!("Error: {}", e);
+            }
+        }
+        Commands::TestMap {
+            path,
+            number_of_tests,
+        } => {
             println!("Testing the Map Implementation...");
-            if let Err(e) = test_map(path, 20) {
+            if let Err(e) = test_map(&path, number_of_tests) {
                 eprintln!("Error: {}", e);
             }
         }
-        Mode::TestReduce => {
+        Commands::TestReduce { path } => {
             println!("Testing the Reduce Implementation...");
-            if let Err(e) = test_reduce(path) {
+            if let Err(e) = test_reduce(&path) {
                 eprintln!("Error: {}", e);
             }
         }
-        Mode::TestWordCount => {
+        Commands::GetWordCount { path, word } => {
             println!("Fetching the test word count from the result...");
-            if let Err(e) = get_test_word_count_from_result(path) {
+            if let Err(e) = get_test_word_count_from_result(&path, &word) {
                 eprintln!("Error: {}", e);
             }
         }
-        Mode::TestResult => {
+        Commands::TestResult => {
             println!("Testing the result from the deployement...");
             if let Err(e) = test_result() {
                 eprintln!("Error: {}", e);
             }
         }
-        Mode::TestAll => {
-            if let Err(e) = test_all(None, None) {
+        Commands::TestAll {
+            number_of_maps,
+            number_of_reduces,
+        } => {
+            if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces)) {
                 eprintln!("Error: {}", e);
             }
         }
