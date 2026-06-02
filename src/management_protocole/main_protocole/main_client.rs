@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 
@@ -247,21 +248,24 @@ async fn do_task(
             println!("All tasks are finished, client is done!");
             println!("Sending all files to server...");
 
-            let status = std::process::Command::new("scp")
-                .arg("-r")
-                .arg(crate::tasks::RESULT_PATH)
-                .arg(format!("{}@{}:/tmp/4sl07_grp3/", user, host_address))
-                .status();
-            match status {
-                Ok(s) if s.success() => {
-                    println!("Files sent successfully!");
+            let command_str = format!("scp -r {} {}@{}:/tmp/4sl07_grp3/", 
+                crate::tasks::RESULT_PATH, 
+                user, 
+                host_address
+            );
+
+            if let Ok(c_command) = CString::new(command_str) {
+                unsafe {
+                    // Appelle directement le système pour lancer la commande via /bin/sh
+                    let status = libc::system(c_command.as_ptr());
+                    if status == 0 {
+                        println!("Succès !");
+                    } else {
+                        println!("Erreur lors de l'exécution de scp : {}", status);
+                    }
                 }
-                Ok(s) => {
-                    eprintln!("Failed to send files, scp exited with status: {}", s);
-                }
-                Err(e) => {
-                    eprintln!("Failed to send files, scp error: {}", e);
-                }
+            } else {
+                eprintln!("Erreur lors de la création de la commande scp");
             }
 
             println!("Cleaning up temporary files...");
