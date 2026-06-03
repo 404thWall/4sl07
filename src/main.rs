@@ -87,6 +87,9 @@ async fn main() {
     match args.cmd {
         Commands::Server => {
             println!("Starting in server mode...");
+            println!("Cleaning up temporary files before starting the server...");
+            management_protocole::main_protocole::clean_temporary_files();
+            println!("Starting main server on 0.0.0.0:9000...");
             if let Err(e) =
                 management_protocole::server::start_server("0.0.0.0:9000", MainServer::new()).await
             {
@@ -98,6 +101,10 @@ async fn main() {
             main_host_address,
             user,
         } => {
+            println!("Starting in client mode...");
+            println!("Cleaning up temporary files before starting the client...");
+            management_protocole::main_protocole::clean_temporary_files();
+            println!("Starting file transfer server for client...");
             tokio::spawn(async move {
                 println!("Starting file transfer server for client...");
                 if let Err(e) = management_protocole::server::start_server(
