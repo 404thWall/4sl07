@@ -265,6 +265,13 @@ async fn do_task(
             prepare_files_for_sending().await;
             send_result_files(user, host_address).await;
             println!("Finished SaveFiles task, asking for next task...");
+            tx.send(Packet::TaskFinished {
+                task,
+                elapsed_time_millis: 0,
+                reduce_files: vec![],
+            })
+            .await
+            .ok();
             tx.send(Packet::AskForTask).await.ok();
         }
         Task::Finished => {
@@ -281,7 +288,7 @@ async fn prepare_files_for_sending() {
     let paths = std::fs::read_dir(crate::tasks::RESULT_PATH).unwrap();
     for path in paths {
         let path = path.unwrap();
-        
+
         // Assuming files are named like "result_{reduce_key}.mapdata"
         let id = path
             .file_name()
@@ -295,7 +302,7 @@ async fn prepare_files_for_sending() {
             .unwrap()
             .parse::<u32>()
             .unwrap();
-        
+
         while !HANDLED_REDUCE_TASKS.read().unwrap().contains_key(&id) {
             println!("Waiting for reduce task {} to be validated...", id);
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;

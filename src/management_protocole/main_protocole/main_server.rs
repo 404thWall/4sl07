@@ -100,14 +100,21 @@ impl ServerHandler for MainServer {
                 println!("Received AskForTask from {}", addr);
                 let mut queue = TASK_QUEUE.write().await;
                 if queue.is_empty() {
-                    if RESULT_FILES_SENT.read().await.len() == CONNECTED_FILE_PORT.read().await.len() {
-                        println!("All result files have been sent, sending Finished task to {}", addr);
+                    if RESULT_FILES_SENT.read().await.len()
+                        == CONNECTED_FILE_PORT.read().await.len()
+                    {
+                        println!(
+                            "All result files have been sent, sending Finished task to {}",
+                            addr
+                        );
                         return Ok(Some(Packet::GiveTask {
                             task: Task::Finished,
                             files_hosts: Vec::new(),
                         }));
                     }
-                    if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
+                    if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32
+                        && !RESULT_FILES_SENT.read().await.contains(&addr.to_string())
+                    {
                         println!("All tasks are finished, sending SaveFiles to {}", addr);
                         return Ok(Some(Packet::GiveTask {
                             task: Task::SaveFiles,
@@ -249,6 +256,10 @@ impl ServerHandler for MainServer {
                             }
                         }
                     }
+                    Task::SaveFiles => {
+                        RESULT_FILES_SENT.write().await.insert(addr.to_string());
+                        println!("Received result files from {}", addr);
+                    }
                     _ => {}
                 }
                 Ok(None)
@@ -269,6 +280,10 @@ impl ServerHandler for MainServer {
             task.abort();
         }
         CONNECTED_FILE_PORT
+            .write()
+            .await
+            .remove(&self.address.as_ref().unwrap().to_string());
+        RESULT_FILES_SENT
             .write()
             .await
             .remove(&self.address.as_ref().unwrap().to_string());
