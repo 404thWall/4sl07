@@ -1,7 +1,7 @@
 use crate::tasks::{MAP_DATA_PATH, run_map_task, run_reduce_task};
 
 use super::map::{map_file, map_single_chunk};
-use super::reduce::reduce_directory;
+use super::reduce::default::reduce_directory;
 use super::saver::{save_one_map_one_file, save_one_map_r_files};
 use super::{INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, RESULT_PATH};
 use rand::seq::SliceRandom;

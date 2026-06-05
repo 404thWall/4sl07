@@ -1,10 +1,17 @@
+use clap::ValueEnum;
 mod map;
 mod reduce;
 mod saver;
 mod testing;
-pub use map::{run_map_task, run_map_task_default};
-pub use reduce::{run_reduce_task, run_reduce_task_default};
+pub use map::{run_map_task, run_map_task_version};
+pub use reduce::{run_reduce_task, run_reduce_task_version};
 pub use testing::{get_test_word_count_from_result, test_all, test_map, test_reduce, test_result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum MapReduceVersion {
+    Default,
+    DefaultWithAsianSplit,
+}
 
 #[derive(Copy, Clone)]
 struct TasksConfig {

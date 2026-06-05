@@ -1,25 +1,7 @@
 use std::{fs, path::Path};
 
 use rustc_hash::FxHashMap;
-
-use crate::tasks::{
-    REDUCE_INITIAL_DATA_PATH, RESULT_PATH,
-    saver::{load_map, save_one_map_one_file},
-};
-
-/// ## The Reduce task
-/// Combines all the maps present in the files located at each path in the `paths` arg.
-pub fn run_reduce_task(directory_path: &str, reduce_id: usize) -> std::io::Result<()> {
-    let mut map: FxHashMap<String, u32> = FxHashMap::default();
-
-    reduce_directory(directory_path, &mut map).unwrap();
-
-    save_one_map_one_file(&map, &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"))
-}
-
-pub fn run_reduce_task_default() -> std::io::Result<()> {
-    run_reduce_task(REDUCE_INITIAL_DATA_PATH, 0)
-}
+use crate::tasks::saver::load_map;
 
 pub fn reduce_directory(
     directory_path: &str,

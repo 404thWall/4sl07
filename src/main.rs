@@ -5,8 +5,8 @@ use slr07::management_protocole::file_transfer_protocole::file_client::FileClien
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
-    MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, get_test_word_count_from_result, run_map_task,
-    run_reduce_task, test_all, test_map, test_reduce, test_result,
+    MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, get_test_word_count_from_result,
+    run_map_task_version, run_reduce_task_version, test_all, test_map, test_reduce, test_result,
 };
 
 #[derive(Parser, Debug)]
@@ -32,18 +32,22 @@ enum Commands {
         /// Path to the _file_ to map.
         path: String,
         #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
-        /// Indicates the number of reduce tasks that will be run. \
+        /// Indicates the number of reduce tasks that will be run.
         /// Allows the map task to create `reduce_number` files
         /// containing the relevant keys for each reduce task.
         reduce_number: usize,
         /// The id of the map task.
         map_id: usize,
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::Default)]
+        version: MapReduceVersion,
     },
     Reduce {
         /// Path to the _directory_ to reduce. Must end in a '/'.
         path: String,
         /// The id of the reduce task.
         reduce_id: usize,
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::Default)]
+        version: MapReduceVersion,
     },
     TestMap {
         /// Path to the _file_ to evaluate the map performance on.
@@ -75,7 +79,7 @@ enum Commands {
         /// word count of the word `word`.
         path: String,
         #[arg(short, long, default_value = "the")]
-        /// Word that we want to have the number of in the results. \
+        /// Word that we want to have the number of in the results.
         /// Should be in lowercase.
         word: String,
     },
@@ -152,9 +156,10 @@ async fn main() {
             path,
             reduce_number,
             map_id,
+            version,
         } => {
             println!("Running the Map Task...");
-            match run_map_task(&path, reduce_number, map_id) {
+            match run_map_task_version(&path, reduce_number, map_id, version) {
                 Err(e) => {
                     eprintln!("Error: {}", e);
                 }
@@ -163,10 +168,19 @@ async fn main() {
                 }
             }
         }
-        Commands::Reduce { path, reduce_id } => {
+        Commands::Reduce {
+            path,
+            reduce_id,
+            version,
+        } => {
             println!("Running the Reduce Task...");
-            if let Err(e) = run_reduce_task(&path, reduce_id) {
-                eprintln!("Error: {}", e);
+            match run_reduce_task_version(&path, reduce_id, version) {
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                }
+                Ok(v) => {
+                    println!("Returned {v:#?}")
+                }
             }
         }
         Commands::TestMap {
