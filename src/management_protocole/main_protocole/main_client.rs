@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 
@@ -14,6 +15,27 @@ pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 pub static HANDLED_REDUCE_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub static FILES_LIST: LazyLock<Vec<PathBuf>> =
+    LazyLock::new(|| {
+        let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
+        let mut candidates = vec![];
+        for path in paths {
+            let path = path.unwrap().path();
+            if path.is_file()
+                && path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("CC-MAIN-")
+            {
+                candidates.push(path);
+            }
+        }
+        candidates.sort();
+        candidates
+    });
 
 pub struct MainClient {
     file_server_port: u16,
@@ -118,25 +140,8 @@ async fn do_task(
             // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
             let begin_time = std::time::Instant::now();
             let map_result = tokio::task::spawn_blocking(move || {
-                let paths = std::fs::read_dir(INITIAL_DATA_PATH)?;
-                let mut candidates = vec![];
-                for path in paths {
-                    let path = path?.path();
-                    if path.is_file()
-                        && path
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .starts_with("CC-MAIN-")
-                    {
-                        candidates.push(path);
-                    }
-                }
-                candidates.sort();
-
-                let path = candidates
-                    .get((key as usize) % candidates.len())
+                let path = FILES_LIST
+                    .get((key as usize) % FILES_LIST.len())
                     .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
                 println!("Starting Map task {} on file {}", key, path.display());
