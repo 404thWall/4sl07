@@ -3,8 +3,8 @@ use rustc_hash::FxHashMap;
 
 //Faster than base HashMap
 use super::saver::save_one_map_r_files;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::fs;
+use std::io::{BufRead, Cursor, Read};
 use std::time::Instant;
 
 /// ## The Map task
@@ -30,8 +30,8 @@ pub fn map_file(
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut ret: Vec<(String, f64)> = vec![];
     let start = Instant::now();
-    let file = File::open(path).unwrap();
-    let mut reader = BufReader::new(file);
+    let file_bytes = fs::read(path)?;
+    let mut reader = Cursor::new(file_bytes);
     let end = start.elapsed().as_secs_f64();
     ret.push(("reader".to_string(), end));
 
