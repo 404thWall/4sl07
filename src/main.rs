@@ -154,8 +154,13 @@ async fn main() {
             map_id,
         } => {
             println!("Running the Map Task...");
-            if let Err(e) = run_map_task(&path, reduce_number, map_id) {
-                eprintln!("Error: {}", e);
+            match run_map_task(&path, reduce_number, map_id) {
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                }
+                Ok(v) => {
+                    println!("Returned {v:#?}")
+                }
             }
         }
         Commands::Reduce { path, reduce_id } => {
