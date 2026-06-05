@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 use std::time::Instant;
 
 mod default;
+mod defaultwithlanguagesplit;
 pub use default::{map_file, map_single_chunk};
 
 /// ## The Map task
@@ -19,7 +20,9 @@ pub fn run_map_task_version(
 
     let mut ret = match version {
         MapReduceVersion::Default => map_file(path, &mut map).unwrap(),
-        MapReduceVersion::DefaultWithAsianSplit => map_file(path, &mut map).unwrap(),
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            defaultwithlanguagesplit::map_file(path, &mut map).unwrap()
+        }
     };
     let start = Instant::now();
     save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id).unwrap();

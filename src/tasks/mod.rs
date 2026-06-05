@@ -10,7 +10,7 @@ pub use testing::{get_test_word_count_from_result, test_all, test_map, test_redu
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum MapReduceVersion {
     Default,
-    DefaultWithAsianSplit,
+    DefaultWithLanguageSplit,
 }
 
 #[derive(Copy, Clone)]

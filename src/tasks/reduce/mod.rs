@@ -2,6 +2,7 @@ use crate::tasks::{MapReduceVersion, RESULT_PATH, saver::save_one_map_one_file};
 use rustc_hash::FxHashMap;
 
 pub mod default;
+mod defaultwithlanguagesplit;
 
 /// ## The Reduce task
 /// Combines all the maps present in the files located at each path in the `paths` arg.
@@ -14,8 +15,8 @@ pub fn run_reduce_task_version(
 
     match version {
         MapReduceVersion::Default => default::reduce_directory(directory_path, &mut map).unwrap(),
-        MapReduceVersion::DefaultWithAsianSplit => {
-            default::reduce_directory(directory_path, &mut map).unwrap()
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            defaultwithlanguagesplit::reduce_directory(directory_path, &mut map).unwrap()
         }
     };
 
