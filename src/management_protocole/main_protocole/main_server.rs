@@ -26,6 +26,7 @@ static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
 
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
+static AVERAGE_ELAPSED_SAVE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
 pub struct MainServer {
     ping_task: Option<tokio::task::JoinHandle<()>>,
@@ -258,7 +259,14 @@ impl ServerHandler for MainServer {
                     }
                     Task::SaveFiles => {
                         RESULT_FILES_SENT.write().await.insert(addr.to_string());
-                        println!("Received result files from {}", addr);
+                        AVERAGE_ELAPSED_SAVE_TIME
+                            .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
+                        println!("Received result files from {} in {} ms", addr, elapsed_time_millis);
+                        println!(
+                            "Average elapsed time (ms) for all save files tasks: {}",
+                            AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
+                                / RESULT_FILES_SENT.read().await.len() as u64
+                        );
                     }
                     _ => {}
                 }

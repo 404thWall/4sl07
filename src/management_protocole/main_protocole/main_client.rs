@@ -262,12 +262,14 @@ async fn do_task(
         }
         Task::SaveFiles => {
             println!("Received SaveFiles task, preparing files for sending...");
+            let begin_time = std::time::Instant::now();
             prepare_files_for_sending().await;
             send_result_files(user, host_address).await;
+            let elapsed_time_millis = begin_time.elapsed().as_millis();
             println!("Finished SaveFiles task, asking for next task...");
             tx.send(Packet::TaskFinished {
                 task,
-                elapsed_time_millis: 0,
+                elapsed_time_millis,
                 reduce_files: vec![],
             })
             .await
