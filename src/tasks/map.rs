@@ -5,25 +5,35 @@ use rustc_hash::FxHashMap;
 use super::saver::save_one_map_r_files;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
+use std::time::Instant;
 
 /// ## The Map task
 /// Maps the file at `path` : counts the number time each word appears into the `map` arg.
-pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<()> {
+pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
 
-    map_file(path, &mut map).unwrap();
+    let ret = map_file(path, &mut map).unwrap();
 
-    save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id)
+    save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id).unwrap();
+    Ok(ret)
 }
 
-pub fn run_map_task_default(path: &str) -> std::io::Result<()> {
+pub fn run_map_task_default(path: &str) -> std::io::Result<Vec<(String, f64)>> {
     run_map_task(path, REDUCE_TASKS_AMOUNT, 0)
 }
 
-pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result<()> {
+pub fn map_file(
+    path: &str,
+    map: &mut FxHashMap<String, u32>,
+) -> std::io::Result<Vec<(String, f64)>> {
+    let mut ret: Vec<(String, f64)> = vec![];
+    let start = Instant::now();
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
+    let end = start.elapsed().as_secs_f64();
+    ret.push(("reader".to_string(), end));
 
+    let start = Instant::now();
     let mut skip_first_body: bool = true;
 
     // Parsing buffers :
@@ -78,7 +88,9 @@ pub fn map_file(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result
             skip_first_body = false;
         }
     }
-    Ok(())
+    let end = start.elapsed().as_secs_f64();
+    ret.push(("mapping".to_string(), end));
+    Ok(ret)
 }
 
 pub fn map_single_chunk(
