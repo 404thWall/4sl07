@@ -12,9 +12,11 @@ use std::time::Instant;
 pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
     let mut map: FxHashMap<String, u32> = FxHashMap::default();
 
-    let ret = map_file(path, &mut map).unwrap();
-
+    let mut ret = map_file(path, &mut map).unwrap();
+    let start = Instant::now();
     save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id).unwrap();
+    let end = start.elapsed().as_secs_f64();
+    ret.push(("saving".to_string(), end));
     Ok(ret)
 }
 
