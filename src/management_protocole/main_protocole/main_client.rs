@@ -144,12 +144,15 @@ async fn do_task(
                     .get((key as usize) % FILES_LIST.len())
                     .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
-                println!("Starting Map task {} on file {}", key, path.display());
-                crate::tasks::run_map_task(
+                println!("Starting Map task {} on file {} after {:?} passed to list files", key, path.display(), begin_time.elapsed());
+                let timings = crate::tasks::run_map_task(
                     path.to_str().unwrap(),
                     REDUCE_TASKS_AMOUNT,
                     key as usize,
                 )?;
+                for (phase, time) in timings {
+                    println!("[Time] Map task {} - Phase {}: {} seconds", key, phase, time);
+                }
                 Ok::<(), std::io::Error>(())
             })
             .await;
