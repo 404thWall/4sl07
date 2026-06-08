@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::{fs::{self, File}, io::{BufRead, Cursor, Write}};
 
 use flate2::read::GzDecoder;
 
@@ -9,24 +9,6 @@ pub enum DownloadError {
 }
 
 pub async fn download_file(url: &str, output_path: &str) -> Result<(), DownloadError>{
-    // let client = reqwest::Client::new();
-    // let response = client
-    //     .get(url)
-    //     .header(reqwest::header::ACCEPT_ENCODING, "identity")
-    //     .send()
-    //     .await
-    //     .map_err(|e| DownloadError::HTTPError(e))?
-    //     .error_for_status()
-    //     .map_err(|e| DownloadError::HTTPError(e))?;
-
-    // let body = response
-    //     .bytes()
-    //     .await
-    //     .map_err(|e| DownloadError::HTTPError(e))?;
-
-    // let mut out = File::create(output_path).map_err(|e| DownloadError::IOError(e))?;
-    // out.write_all(body.as_ref()).map_err(|e| DownloadError::IOError(e))
-
     let response = reqwest::get(url).await.map_err(|e| DownloadError::HTTPError(e))?;
     let body = response.bytes().await.map_err(|e| DownloadError::HTTPError(e))?;
     let mut out = File::create(output_path).unwrap();
@@ -41,16 +23,28 @@ pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub async fn list_commoncrawl_files() {
+pub async fn list_commoncrawl_files() -> Result<Vec<String>, DownloadError> {
     let url = "https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-21/wet.paths.gz";
     let output_path = "wet.paths.gz";
     let dest = "wet.paths";
-    download_file(url, output_path).await.unwrap();
+    download_file(url, output_path).await?;
     unzip_file(output_path, dest).await.unwrap();
     std::fs::remove_file(output_path).unwrap();
+
+    let file_bytes = fs::read(dest).unwrap();
+    let reader = Cursor::new(file_bytes);
+
+    let paths = reader.lines().map(|line| line.unwrap()).collect::<Vec<String>>();
+    std::fs::remove_file(dest).unwrap();
+
+    Ok(paths)
 }
 
 pub async fn test_download() -> Result<(), DownloadError> {
-    list_commoncrawl_files().await;
+    let paths = list_commoncrawl_files().await?;
+    println!("Last 10 paths :");
+    for path in paths.iter().rev().take(10) {
+        println!("{}", path);
+    }
     Ok(())
 }
