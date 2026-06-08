@@ -85,6 +85,7 @@ enum Commands {
         /// Should be in lowercase.
         word: String,
     },
+    TestDownload,
 }
 
 #[tokio::main]
@@ -219,6 +220,12 @@ async fn main() {
         } => {
             if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces), version) {
                 eprintln!("Error: {}", e);
+            }
+        }
+        Commands::TestDownload => {
+            println!("Testing the download of the commoncrawl files...");
+            if let Err(e) = management_protocole::main_protocole::downloader::test_download().await {
+                eprintln!("Error: {:?}", e);
             }
         }
     }
