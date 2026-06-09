@@ -261,7 +261,10 @@ impl ServerHandler for MainServer {
                         RESULT_FILES_SENT.write().await.insert(addr.to_string());
                         AVERAGE_ELAPSED_SAVE_TIME
                             .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-                        println!("Received result files from {} in {} ms", addr, elapsed_time_millis);
+                        println!(
+                            "Received result files from {} in {} ms",
+                            addr, elapsed_time_millis
+                        );
                         println!(
                             "Average elapsed time (ms) for all save files tasks: {}",
                             AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)

@@ -224,7 +224,8 @@ async fn main() {
         }
         Commands::TestDownload => {
             println!("Testing the download of the commoncrawl files...");
-            if let Err(e) = management_protocole::main_protocole::downloader::test_download().await {
+            if let Err(e) = management_protocole::main_protocole::downloader::test_download().await
+            {
                 eprintln!("Error: {:?}", e);
             }
         }

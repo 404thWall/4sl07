@@ -1,5 +1,7 @@
 use std::{
-    fmt::format, fs::{self, File}, io::{BufRead, Cursor, Write}
+    fmt::format,
+    fs::{self, File},
+    io::{BufRead, Cursor, Write},
 };
 
 use flate2::read::MultiGzDecoder;
@@ -11,18 +13,12 @@ pub enum DownloadError {
 }
 
 pub async fn download_file(url: &str, output_path: &str) -> Result<(), DownloadError> {
-    let response = reqwest::get(url)
-        .await
-        .map_err(DownloadError::HTTPError)?;
-    let body = response
-        .bytes()
-        .await
-        .map_err(DownloadError::HTTPError)?;
+    let response = reqwest::get(url).await.map_err(DownloadError::HTTPError)?;
+    let body = response.bytes().await.map_err(DownloadError::HTTPError)?;
     let dest_path = std::path::Path::new(output_path);
     std::fs::create_dir_all(dest_path.parent().unwrap()).map_err(DownloadError::IOError)?;
     let mut out = File::create(dest_path).unwrap();
-    out.write_all(body.as_ref())
-        .map_err(DownloadError::IOError)
+    out.write_all(body.as_ref()).map_err(DownloadError::IOError)
 }
 
 pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
@@ -59,11 +55,11 @@ pub async fn get_commoncrawl_file(path: &str, output_name: &str) -> Result<(), D
     let url = format!("https://data.commoncrawl.org/{}", path);
     let gz_file = format!("{}.warc.wet.gz", output_name);
     let dest = format!("{}.warc.wet", output_name);
-    
+
     download_file(&url, &gz_file).await.unwrap();
     unzip_file(&gz_file, &dest).await.unwrap();
     std::fs::remove_file(&gz_file).unwrap();
-    
+
     Ok(())
 }
 

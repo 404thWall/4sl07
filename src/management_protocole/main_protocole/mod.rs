@@ -1,6 +1,6 @@
+pub mod downloader;
 pub mod main_client;
 pub mod main_server;
-pub mod downloader;
 
 pub fn clean_temporary_files() {
     for path in crate::tasks::FOLDERS_TO_DELETE {

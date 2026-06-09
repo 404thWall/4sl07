@@ -16,26 +16,25 @@ pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
 pub static HANDLED_REDUCE_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-pub static FILES_LIST: LazyLock<Vec<PathBuf>> =
-    LazyLock::new(|| {
-        let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
-        let mut candidates = vec![];
-        for path in paths {
-            let path = path.unwrap().path();
-            if path.is_file()
-                && path
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .starts_with("CC-MAIN-")
-            {
-                candidates.push(path);
-            }
+pub static FILES_LIST: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
+    let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
+    let mut candidates = vec![];
+    for path in paths {
+        let path = path.unwrap().path();
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("CC-MAIN-")
+        {
+            candidates.push(path);
         }
-        candidates.sort();
-        candidates
-    });
+    }
+    candidates.sort();
+    candidates
+});
 
 pub struct MainClient {
     file_server_port: u16,
@@ -144,14 +143,22 @@ async fn do_task(
                     .get((key as usize) % FILES_LIST.len())
                     .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
-                println!("Starting Map task {} on file {} after {:?} passed to list files", key, path.display(), begin_time.elapsed());
+                println!(
+                    "Starting Map task {} on file {} after {:?} passed to list files",
+                    key,
+                    path.display(),
+                    begin_time.elapsed()
+                );
                 let timings = crate::tasks::run_map_task(
                     path.to_str().unwrap(),
                     REDUCE_TASKS_AMOUNT,
                     key as usize,
                 )?;
                 for (phase, time) in timings {
-                    println!("[Time] Map task {} - Phase {}: {} seconds", key, phase, time);
+                    println!(
+                        "[Time] Map task {} - Phase {}: {} seconds",
+                        key, phase, time
+                    );
                 }
                 Ok::<(), std::io::Error>(())
             })
