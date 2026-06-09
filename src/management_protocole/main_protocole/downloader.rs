@@ -1,5 +1,4 @@
 use std::{
-    fmt::format,
     fs::{self, File},
     io::{BufRead, Cursor, Write},
 };
@@ -26,7 +25,7 @@ pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
     let mut decoder = MultiGzDecoder::new(src_file);
     let dest_path = std::path::Path::new(dest);
     std::fs::create_dir_all(dest_path.parent().unwrap())?;
-    let mut dest_file = File::create(&dest_path)?;
+    let mut dest_file = File::create(dest_path)?;
     std::io::copy(&mut decoder, &mut dest_file)?;
     Ok(())
 }

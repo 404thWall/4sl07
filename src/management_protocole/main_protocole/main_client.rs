@@ -312,7 +312,7 @@ async fn prepare_files_for_sending() {
             .to_str()
             .unwrap()
             .split('.')
-            .nth(0)
+            .next()
             .unwrap()
             .split('_')
             .nth(1)
