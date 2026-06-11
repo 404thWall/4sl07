@@ -1,23 +1,44 @@
 use std::{
     fs::{self, File},
-    io::{BufRead, Cursor, Write},
+    io::{BufRead, Cursor},
 };
 
 use flate2::read::MultiGzDecoder;
+use std::ffi::CString;
 
 #[derive(Debug)]
 pub enum DownloadError {
-    HTTPError(reqwest::Error),
+    HTTPError,
     IOError(std::io::Error),
 }
 
 pub async fn download_file(url: &str, output_path: &str) -> Result<(), DownloadError> {
-    let response = reqwest::get(url).await.map_err(DownloadError::HTTPError)?;
-    let body = response.bytes().await.map_err(DownloadError::HTTPError)?;
     let dest_path = std::path::Path::new(output_path);
     std::fs::create_dir_all(dest_path.parent().unwrap()).map_err(DownloadError::IOError)?;
-    let mut out = File::create(dest_path).unwrap();
-    out.write_all(body.as_ref()).map_err(DownloadError::IOError)
+
+    let command_str = format!(
+        "curl -L --retry 5 --retry-delay 3 -C - {} -o {}",
+        url,
+        output_path
+    );
+
+    if let Ok(c_command) = CString::new(command_str) {
+        unsafe {
+            // Appelle directement le système pour lancer la commande via /bin/sh
+            let status = libc::system(c_command.as_ptr());
+            if status == 0 {
+                println!("Files successfully downloaded !");
+                Ok(())
+                
+            } else {
+                println!("Error executing curl: {}", status);
+                Err(DownloadError::HTTPError)
+            }
+        }
+    } else {
+        eprintln!("Error creating curl command");
+        Err(DownloadError::HTTPError)
+    }
 }
 
 pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
