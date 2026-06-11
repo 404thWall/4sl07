@@ -24,6 +24,8 @@ static MAP_RESULT_FILES: LazyLock<RwLock<HashMap<u32, HashSet<String>>>> =
 static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
     LazyLock::new(|| RwLock::new(HashSet::new()));
 
+static MAIN_TIME: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
+
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_SAVE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
@@ -95,10 +97,13 @@ impl ServerHandler for MainServer {
                     .write()
                     .await
                     .insert(addr.to_string(), server_port);
+
+                // Initialize the main time when the first worker connects
+                println!("Main time initialized since: {:?}", MAIN_TIME.elapsed());
                 Ok(None)
             }
             Packet::AskForTask => {
-               //  println!("Received AskForTask from {}", addr);
+                //  println!("Received AskForTask from {}", addr);
                 let mut queue = TASK_QUEUE.write().await;
                 if queue.is_empty() {
                     if RESULT_FILES_SENT.read().await.len()
@@ -298,6 +303,23 @@ impl ServerHandler for MainServer {
             .write()
             .await
             .remove(&self.address.as_ref().unwrap().to_string());
+        if CONNECTED_FILE_PORT.read().await.is_empty() {
+            println!("================================");
+            println!("All workers disconnecter, stopping server...");
+            let elapsed_time = MAIN_TIME.elapsed();
+            println!("Total elapsed time: {:?}", elapsed_time);
+            println!(
+                "Average elapsed time (ms) for all map tasks: {}",
+                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst) / MAP_TASKS_AMOUNT as u64
+            );
+            println!(
+                "Average elapsed time (ms) for all reduce tasks: {}",
+                AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
+                    / REDUCE_TASKS_AMOUNT as u64
+            );
+            println!("================================");
+            std::process::exit(0);
+        }
         Ok(())
     }
 }
