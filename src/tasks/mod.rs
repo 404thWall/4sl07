@@ -28,7 +28,7 @@ struct TasksConfig {
 
 #[cfg(feature = "prod")]
 const CONFIG: TasksConfig = TasksConfig {
-    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/index.html",
+    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/wet.paths.gz",
     initial_data_path: "/cal/commoncrawl/",
     map_data_path: "/tmp/4sl07_grp3/map_data/",
     reduce_initial_data_path: "/tmp/4sl07_grp3/to_reduce/",
@@ -45,7 +45,7 @@ const CONFIG: TasksConfig = TasksConfig {
 
 #[cfg(not(feature = "prod"))]
 const CONFIG: TasksConfig = TasksConfig {
-    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/index.html",
+    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/wet.paths.gz",
     initial_data_path: "../data/",
     map_data_path: "./map_data/",
     reduce_initial_data_path: "./to_reduce/",
