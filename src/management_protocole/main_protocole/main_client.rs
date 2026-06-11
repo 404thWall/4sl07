@@ -239,9 +239,19 @@ async fn do_task(
                         )
                         .await;
                         println!("Finished connecting to worker at {}: {:?}", addr, res);
+                        res
                     }));
                 }
-                join_all(tasks).await;
+                let joined_results = join_all(tasks).await;
+                for res in joined_results {
+                    if let Err(e) = res {
+                        eprintln!("Error in Reduce task {}: {}", key, e);
+                        return Err(ProtocolError::TaskFailed(format!("Reduce task {} error: {}", key, e)));
+                    } else if let Err(e) = res.unwrap() {
+                        eprintln!("Connection Protocole Error in Reduce task {}: {}", key, e);
+                        return Err(ProtocolError::TaskFailed(format!("Reduce task {} connection protocole error: {}", key, e)));
+                    }
+                }
             } else {
                 println!("No connected clients");
             }
