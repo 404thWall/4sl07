@@ -82,7 +82,7 @@ impl ServerHandler for MainServer {
                 Ok(Some(Packet::Pong))
             }
             Packet::Pong => {
-                println!("Received Pong from {}", addr);
+                // println!("Received Pong from {}", addr);
                 LAST_RECEIVED_PING.write().await.insert(addr.to_string(), 0);
                 Ok(None)
             }
@@ -98,7 +98,7 @@ impl ServerHandler for MainServer {
                 Ok(None)
             }
             Packet::AskForTask => {
-                println!("Received AskForTask from {}", addr);
+               //  println!("Received AskForTask from {}", addr);
                 let mut queue = TASK_QUEUE.write().await;
                 if queue.is_empty() {
                     if RESULT_FILES_SENT.read().await.len()
@@ -122,7 +122,7 @@ impl ServerHandler for MainServer {
                             files_hosts: Vec::new(),
                         }));
                     }
-                    println!("No more tasks available for {}, sending None", addr);
+                    //println!("No more tasks available for {}, sending None", addr);
                     return Ok(Some(Packet::GiveTask {
                         task: Task::None,
                         files_hosts: Vec::new(),
@@ -306,11 +306,11 @@ async fn server_ping_task(tx: &mut Sender<OutMsg>, addr: &std::net::SocketAddr) 
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(10));
     loop {
         ticker.tick().await;
-        println!(
-            "Sending Ping to {} at {:?}",
-            addr,
-            std::time::SystemTime::now()
-        );
+        // println!(
+        //     "Sending Ping to {} at {:?}",
+        //     addr,
+        //     std::time::SystemTime::now()
+        // );
         if tx.send(OutMsg::MsgPacket(Packet::Ping)).await.is_err() {
             break;
         }
