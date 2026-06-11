@@ -31,7 +31,7 @@ pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
 }
 
 pub async fn list_commoncrawl_files(tmp_dir: &str) -> Result<Vec<String>, DownloadError> {
-    let url = "https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-21/wet.paths.gz";
+    let url = crate::tasks::WET_PATHS_URL;
     let output_path = format!("{}wet.paths.gz", tmp_dir);
     let dest = format!("{}wet.paths", tmp_dir);
     download_file(url, &output_path).await?;

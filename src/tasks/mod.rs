@@ -15,6 +15,7 @@ pub enum MapReduceVersion {
 
 #[derive(Copy, Clone)]
 struct TasksConfig {
+    wet_paths_url: &'static str,
     initial_data_path: &'static str,
     map_data_path: &'static str,
     reduce_initial_data_path: &'static str,
@@ -27,6 +28,7 @@ struct TasksConfig {
 
 #[cfg(feature = "prod")]
 const CONFIG: TasksConfig = TasksConfig {
+    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/index.html",
     initial_data_path: "/cal/commoncrawl/",
     map_data_path: "/tmp/4sl07_grp3/map_data/",
     reduce_initial_data_path: "/tmp/4sl07_grp3/to_reduce/",
@@ -43,6 +45,7 @@ const CONFIG: TasksConfig = TasksConfig {
 
 #[cfg(not(feature = "prod"))]
 const CONFIG: TasksConfig = TasksConfig {
+    wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/index.html",
     initial_data_path: "../data/",
     map_data_path: "./map_data/",
     reduce_initial_data_path: "./to_reduce/",
@@ -53,6 +56,7 @@ const CONFIG: TasksConfig = TasksConfig {
     reduce_tasks_amount: 6,
 };
 
+pub const WET_PATHS_URL: &str = CONFIG.wet_paths_url;
 pub const INITIAL_DATA_PATH: &str = CONFIG.initial_data_path;
 pub const MAP_DATA_PATH: &str = CONFIG.map_data_path;
 pub const REDUCE_INITIAL_DATA_PATH: &str = CONFIG.reduce_initial_data_path;
