@@ -88,6 +88,10 @@ impl ClientHandler for MainClient {
                 Ok(None)
             }
             Packet::TaskValidation { validated, task } => {
+                println!(
+                    "Received TaskValidation for task {:?} with validated = {}",
+                    task, validated
+                );
                 match task {
                     Task::Map(key, _) => {
                         HANDLED_MAP_TASKS.write().unwrap().insert(key, validated);
