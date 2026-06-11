@@ -38,9 +38,10 @@ const CONFIG: TasksConfig = TasksConfig {
         "/tmp/4sl07_grp3/result",
         "/tmp/4sl07_grp3/map_data/",
         "/tmp/4sl07_grp3/to_reduce/",
+        "/tmp/4sl07_grp3/tmp/",
     ],
-    map_tasks_amount: 250,
-    reduce_tasks_amount: 42,
+    map_tasks_amount: 1000,
+    reduce_tasks_amount: 40,
 };
 
 #[cfg(not(feature = "prod"))]
@@ -51,7 +52,7 @@ const CONFIG: TasksConfig = TasksConfig {
     reduce_initial_data_path: "./to_reduce/",
     result_path: "../result/",
     tmp_dir: "./tmp/",
-    folders_to_delete: &["./map_data/"],
+    folders_to_delete: &["./map_data/", "./tmp/"],
     map_tasks_amount: 4,
     reduce_tasks_amount: 6,
 };
