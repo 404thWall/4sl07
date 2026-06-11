@@ -1,7 +1,13 @@
 #!/bin/bash
 
-line=$(head -n 1 pids.txt)
-kill $line
+echo "Killing previous processes..."
+while IFS= read -r line; do
+    kill $line 2>/dev/null
+done < pids.txt
+
+if [ $# -gt 0 ]; then
+    exit 0
+fi
 
 rm -rf ./tests/client_*/
 rm -rf ./tests/server/
