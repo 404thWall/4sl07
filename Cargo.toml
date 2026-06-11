@@ -22,3 +22,9 @@ unicode-script = "0.5.8"
 [features]
 default = []
 prod = []
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
