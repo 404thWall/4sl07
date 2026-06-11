@@ -136,7 +136,11 @@ async fn do_task(
                 .unwrap();
             let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
             let path = downloader::get_commoncrawl_file(link, &path).await.unwrap();
-            println!("File downloaded for Map task {} in {:?}", key, begin_time.elapsed());
+            println!(
+                "File downloaded for Map task {} in {:?}",
+                key,
+                begin_time.elapsed()
+            );
 
             // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
             let map_result = tokio::task::spawn_blocking(move || {
