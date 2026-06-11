@@ -125,21 +125,28 @@ async fn do_task(
         Task::Map(key, _nkeys) => {
             let begin_time = std::time::Instant::now();
 
-            // Get the file link corresponding to the key and download it
-            println!("Starting Map task {}: downloading file...", key);
-            let links = FILES_LINK_LIST
-                .get_or_init(async || {
-                    downloader::list_commoncrawl_files(crate::tasks::TMP_DIR)
-                        .await
-                        .unwrap()
+            let path = tokio::task::spawn_blocking(move || {
+                tokio::runtime::Handle::current().block_on(async {
+                    // Get the file link corresponding to the key and download it
+                    println!("Starting Map task {}: downloading file...", key);
+                    let links = FILES_LINK_LIST
+                        .get_or_init(async || {
+                            downloader::list_commoncrawl_files(crate::tasks::TMP_DIR)
+                                .await
+                                .unwrap()
+                        })
+                        .await;
+                    let link = links
+                        .get((key as usize) % links.len())
+                        .ok_or_else(|| std::io::Error::other("No candidate input files found"))
+                        .unwrap();
+                    let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
+                    downloader::get_commoncrawl_file(link, &path).await.unwrap()
                 })
-                .await;
-            let link = links
-                .get((key as usize) % links.len())
-                .ok_or_else(|| std::io::Error::other("No candidate input files found"))
-                .unwrap();
-            let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
-            let path = downloader::get_commoncrawl_file(link, &path).await.unwrap();
+            })
+            .await
+            .unwrap();
+
             println!(
                 "File downloaded for Map task {} in {:?}",
                 key,
@@ -280,8 +287,14 @@ async fn do_task(
         Task::SaveFiles => {
             println!("Received SaveFiles task, preparing files for sending...");
             let begin_time = std::time::Instant::now();
-            prepare_files_for_sending().await;
-            send_result_files(user, host_address).await;
+            tokio::task::spawn_blocking(move || {
+                tokio::runtime::Handle::current().block_on(async {
+                    prepare_files_for_sending().await;
+                    send_result_files(user, host_address).await;
+                });
+            })
+            .await
+            .unwrap();
             let elapsed_time_millis = begin_time.elapsed().as_millis();
             println!("Finished SaveFiles task, asking for next task...");
             tx.send(Packet::TaskFinished {
