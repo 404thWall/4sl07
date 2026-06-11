@@ -1,4 +1,4 @@
-use crate::tasks::{MapReduceVersion, RESULT_PATH, saver::save_one_map_one_file};
+use crate::tasks::{DEFAULT_VERSION, MapReduceVersion, RESULT_PATH, saver::save_one_map_one_file};
 use rustc_hash::FxHashMap;
 
 pub mod default;
@@ -25,5 +25,5 @@ pub fn run_reduce_task_version(
 }
 
 pub fn run_reduce_task(directory_path: &str, reduce_id: usize) -> std::io::Result<()> {
-    run_reduce_task_version(directory_path, reduce_id, MapReduceVersion::DefaultWithLanguageSplit)
+    run_reduce_task_version(directory_path, reduce_id, DEFAULT_VERSION)
 }

@@ -1,6 +1,6 @@
 use super::MapReduceVersion;
 use super::saver::save_one_map_r_files;
-use crate::tasks::MAP_DATA_PATH;
+use crate::tasks::{DEFAULT_VERSION, MAP_DATA_PATH};
 use rustc_hash::FxHashMap;
 use std::time::Instant;
 
@@ -32,5 +32,5 @@ pub fn run_map_task_version(
 }
 
 pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
-    run_map_task_version(path, r, map_id, MapReduceVersion::DefaultWithLanguageSplit)
+    run_map_task_version(path, r, map_id, DEFAULT_VERSION)
 }
