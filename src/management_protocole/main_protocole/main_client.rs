@@ -68,7 +68,7 @@ impl ClientHandler for MainClient {
                 let user = self.user.clone();
                 let host_address = self.host_address.clone();
                 tokio::spawn(async move {
-                    do_task(
+                    if let Err(e) = do_task(
                         task,
                         tx.clone(),
                         connected_clients,
@@ -77,7 +77,11 @@ impl ClientHandler for MainClient {
                         user,
                         host_address,
                     )
-                    .await;
+                    .await {
+                        eprintln!("Error executing a task: {}", e);
+                        // TODO: maybe send a specific packet to the server to notify about the failure, so it can decide to retry or not
+                        // Otherwise, we can disconnect, and the server will reassign the task to another client
+                    }
                 });
                 println!("Launched task in background");
                 Ok(None)
@@ -120,7 +124,7 @@ async fn do_task(
     files_hosts: Vec<String>,
     user: String,
     host_address: String,
-) {
+) -> Result<(), ProtocolError> {
     match task {
         Task::Map(key, _nkeys) => {
             let begin_time = std::time::Instant::now();
@@ -138,14 +142,14 @@ async fn do_task(
                         .await;
                     let link = links
                         .get((key as usize) % links.len())
-                        .ok_or_else(|| std::io::Error::other("No candidate input files found"))
                         .unwrap();
                     let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
-                    downloader::get_commoncrawl_file(link, &path).await.unwrap()
+                    downloader::get_commoncrawl_file(link, &path).await
                 })
             })
             .await
-            .unwrap();
+            .or_else(|e| Err(ProtocolError::TaskFailed(format!("Map task {} download join error: {}", key, e))))?
+            .or_else(|e| Err(ProtocolError::TaskFailed(format!("Map task {} download error: {:?}", key, e))))?;
 
             println!(
                 "File downloaded for Map task {} in {:?}",
@@ -178,12 +182,12 @@ async fn do_task(
                 Ok(Err(e)) => {
                     eprintln!("Map task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return;
+                    return Err(ProtocolError::TaskFailed(format!("Map task {} failed: {}", key, e)));
                 }
                 Err(e) => {
                     eprintln!("Map task {} join error: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return;
+                    return Err(ProtocolError::TaskFailed(format!("Map task {} join error: {}", key, e)));
                 }
             };
 
@@ -204,6 +208,7 @@ async fn do_task(
             .await
             .ok();
             tx.send(Packet::AskForTask).await.ok();
+            Ok(())
         }
         Task::Reduce(key, _nkeys) => {
             let begin_time = std::time::Instant::now();
@@ -261,12 +266,12 @@ async fn do_task(
                 Ok(Err(e)) => {
                     eprintln!("Reduce task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return;
+                    return Err(ProtocolError::TaskFailed(format!("Reduce task {} failed: {}", key, e)));
                 }
                 Err(e) => {
                     eprintln!("Reduce task {} join error: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return;
+                    return Err(ProtocolError::TaskFailed(format!("Reduce task {} join error: {}", key, e)));
                 }
             }
             let elapsed_time_millis = begin_time.elapsed().as_millis();
@@ -278,11 +283,13 @@ async fn do_task(
             .await
             .ok();
             tx.send(Packet::AskForTask).await.ok();
+            Ok(())
         }
         Task::None => {
             println!("Nothing to do for now, launching a new AskForTask after 1s...");
             tokio::time::sleep(Duration::from_secs(1)).await;
             tx.send(Packet::AskForTask).await.ok();
+            Ok(())
         }
         Task::SaveFiles => {
             println!("Received SaveFiles task, preparing files for sending...");
@@ -305,6 +312,7 @@ async fn do_task(
             .await
             .ok();
             tx.send(Packet::AskForTask).await.ok();
+            Ok(())
         }
         Task::Finished => {
             println!("All tasks are finished, client is done!");
