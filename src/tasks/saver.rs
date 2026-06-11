@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fs::{self, File},
     hash::{DefaultHasher, Hash, Hasher},
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter},
     path::Path,
 };
 
@@ -15,14 +15,13 @@ pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> s
     fs::create_dir_all(save_directory)?;
 
     let write_file = File::create(save_path)?;
-    let mut writer = BufWriter::new(write_file);
+    let writer = BufWriter::new(write_file);
 
     //Serialize the FxHashMap directly into the file
-    let e = bincode::serialize_into(&mut writer, map);
+    let e = serde_json::to_writer_pretty(writer, &map);
     if e.is_err() {
         panic!("Error writing : {:?}", e);
     }
-    writer.flush()?;
 
     Ok(())
 }
@@ -58,7 +57,7 @@ pub fn load_map(file_path: &str) -> std::io::Result<FxHashMap<String, u32>> {
     let read_file = File::open(file_path)?;
     let reader = BufReader::new(read_file);
 
-    let loaded_map = bincode::deserialize_from(reader);
+    let loaded_map = serde_json::from_reader(reader);
     if loaded_map.is_err() {
         panic!("Error loading : {:?}", loaded_map)
     }

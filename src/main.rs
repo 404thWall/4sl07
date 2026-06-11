@@ -38,7 +38,7 @@ enum Commands {
         reduce_number: usize,
         /// The id of the map task.
         map_id: usize,
-        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::Default)]
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
     },
     Reduce {
@@ -46,7 +46,7 @@ enum Commands {
         path: String,
         /// The id of the reduce task.
         reduce_id: usize,
-        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::Default)]
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
     },
     TestMap {
@@ -73,6 +73,8 @@ enum Commands {
         number_of_maps: usize,
         #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
         number_of_reduces: usize,
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
+        version: MapReduceVersion,
     },
     GetWordCount {
         /// Path to the result _directory_ from which we want to get the
@@ -213,8 +215,9 @@ async fn main() {
         Commands::TestAll {
             number_of_maps,
             number_of_reduces,
+            version
         } => {
-            if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces)) {
+            if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces), version) {
                 eprintln!("Error: {}", e);
             }
         }

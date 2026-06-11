@@ -1,4 +1,4 @@
-use crate::tasks::{MAP_DATA_PATH, run_map_task, run_reduce_task};
+use crate::tasks::{MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version};
 
 use super::map::{map_file, map_single_chunk};
 use super::reduce::default::reduce_directory;
@@ -213,10 +213,18 @@ pub fn test_result() -> std::io::Result<()> {
 pub fn test_all(
     number_of_splits: Option<usize>,
     number_of_reduces: Option<usize>,
+    version: MapReduceVersion
 ) -> std::io::Result<()> {
     let number_of_splits = number_of_splits.unwrap_or(5);
     let number_of_reduces = number_of_reduces.unwrap_or(REDUCE_TASKS_AMOUNT);
     let mut manual_map: FxHashMap<String, u32> = FxHashMap::default();
+
+    let map_file = match version {
+        MapReduceVersion::Default => {
+            super::map::default::map_file
+        },
+        MapReduceVersion::DefaultWithLanguageSplit => super::map::defaultwithlanguagesplit::map_file
+    };
 
     print!("Deleting previous files... ");
     io::stdout().flush().unwrap();
@@ -268,7 +276,7 @@ pub fn test_all(
             map_file(&name, &mut manual_map).unwrap();
             print!("50%... ");
             io::stdout().flush().unwrap();
-            run_map_task(&name, number_of_reduces, i).unwrap();
+            run_map_task_version(&name, number_of_reduces, i, version).unwrap();
             println!("Done.");
         } else {
             panic!("Failed to start the {i}th map task.")
@@ -296,7 +304,7 @@ pub fn test_all(
     for r in 0..number_of_reduces {
         print!("Starting {r}th reduce task... ");
         io::stdout().flush().unwrap();
-        run_reduce_task(&format!("/tmp/4sl07_grp3/tests/reduce{r}/"), r).unwrap();
+        run_reduce_task_version(&format!("/tmp/4sl07_grp3/tests/reduce{r}/"), r, version).unwrap();
         println!("Done.");
     }
     println!("Finished reduce tasks.");

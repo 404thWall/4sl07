@@ -4,8 +4,8 @@ use crate::tasks::MAP_DATA_PATH;
 use rustc_hash::FxHashMap;
 use std::time::Instant;
 
-mod default;
-mod defaultwithlanguagesplit;
+pub mod default;
+pub mod defaultwithlanguagesplit;
 pub use default::{map_file, map_single_chunk};
 
 /// ## The Map task
