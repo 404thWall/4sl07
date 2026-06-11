@@ -32,8 +32,8 @@ pub async fn unzip_file(src: &str, dest: &str) -> Result<(), std::io::Error> {
 
 pub async fn list_commoncrawl_files(tmp_dir: &str) -> Result<Vec<String>, DownloadError> {
     let url = "https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-21/wet.paths.gz";
-    let output_path = format!("{}/wet.paths.gz", tmp_dir);
-    let dest = format!("{}/wet.paths", tmp_dir);
+    let output_path = format!("{}wet.paths.gz", tmp_dir);
+    let dest = format!("{}wet.paths", tmp_dir);
     download_file(url, &output_path).await?;
     unzip_file(&output_path, &dest).await.unwrap();
     std::fs::remove_file(&output_path).unwrap();
@@ -50,8 +50,8 @@ pub async fn list_commoncrawl_files(tmp_dir: &str) -> Result<Vec<String>, Downlo
     Ok(paths)
 }
 
-pub async fn get_commoncrawl_file(path: &str, output_name: &str) -> Result<(), DownloadError> {
-    let url = format!("https://data.commoncrawl.org/{}", path);
+pub async fn get_commoncrawl_file(link: &str, output_name: &str) -> Result<String, DownloadError> {
+    let url = format!("https://data.commoncrawl.org/{}", link);
     let gz_file = format!("{}.warc.wet.gz", output_name);
     let dest = format!("{}.warc.wet", output_name);
 
@@ -59,16 +59,21 @@ pub async fn get_commoncrawl_file(path: &str, output_name: &str) -> Result<(), D
     unzip_file(&gz_file, &dest).await.unwrap();
     std::fs::remove_file(&gz_file).unwrap();
 
-    Ok(())
+    Ok(dest)
 }
 
 pub async fn test_download() -> Result<(), DownloadError> {
-    let paths = list_commoncrawl_files("./tests/data").await?;
-    println!("Last 10 paths :");
-    for (i, path) in paths.iter().rev().take(10).enumerate() {
-        println!("Downloading {}...", path);
+    let links = list_commoncrawl_files("./tests/data/").await?;
+    println!("Last 10 links :");
+    for (i, link) in links.iter().rev().take(10).enumerate() {
+        println!("Downloading {}...", link);
         let output_name = format!("./tests/data/CC-MAIN-{}", i);
-        get_commoncrawl_file(path, &output_name).await.unwrap();
+        get_commoncrawl_file(link, &output_name).await.unwrap();
     }
     Ok(())
+}
+
+pub fn test_download_sync() -> Result<(), DownloadError> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(test_download())
 }

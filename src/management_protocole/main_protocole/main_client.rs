@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 
+use super::downloader;
 use crate::management_protocole::client::{ClientHandler, start_client};
 use crate::management_protocole::file_transfer_protocole::file_client::FileClient;
 use crate::management_protocole::{Packet, ProtocolError, Task};
-use crate::tasks::{INITIAL_DATA_PATH, REDUCE_TASKS_AMOUNT};
+use crate::tasks::REDUCE_TASKS_AMOUNT;
 use futures::future::join_all;
+use tokio::sync::OnceCell;
 use tokio::sync::mpsc::Sender;
 
 pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
@@ -16,25 +17,7 @@ pub static HANDLED_MAP_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
 pub static HANDLED_REDUCE_TASKS: LazyLock<RwLock<HashMap<u32, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-pub static FILES_LIST: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
-    let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
-    let mut candidates = vec![];
-    for path in paths {
-        let path = path.unwrap().path();
-        if path.is_file()
-            && path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .starts_with("CC-MAIN-")
-        {
-            candidates.push(path);
-        }
-    }
-    candidates.sort();
-    candidates
-});
+pub static FILES_LINK_LIST: OnceCell<Vec<String>> = OnceCell::const_new();
 
 pub struct MainClient {
     file_server_port: u16,
@@ -136,30 +119,41 @@ async fn do_task(
 ) {
     match task {
         Task::Map(key, _nkeys) => {
-            // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
             let begin_time = std::time::Instant::now();
-            let map_result = tokio::task::spawn_blocking(move || {
-                let path = FILES_LIST
-                    .get((key as usize) % FILES_LIST.len())
-                    .ok_or_else(|| std::io::Error::other("No candidate input files found"))?;
 
+            // Get the file link corresponding to the key and download it
+            println!("Starting Map task {}: downloading file...", key);
+            let links = FILES_LINK_LIST
+                .get_or_init(async || {
+                    downloader::list_commoncrawl_files(crate::tasks::TMP_DIR)
+                        .await
+                        .unwrap()
+                })
+                .await;
+            let link = links
+                .get((key as usize) % links.len())
+                .ok_or_else(|| std::io::Error::other("No candidate input files found"))
+                .unwrap();
+            let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
+            let path = downloader::get_commoncrawl_file(link, &path).await.unwrap();
+            println!("File downloaded for Map task {} in {:?}", key, begin_time.elapsed());
+
+            // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
+            let map_result = tokio::task::spawn_blocking(move || {
                 println!(
                     "Starting Map task {} on file {} after {:?} passed to list files",
                     key,
-                    path.display(),
+                    path,
                     begin_time.elapsed()
                 );
-                let timings = crate::tasks::run_map_task(
-                    path.to_str().unwrap(),
-                    REDUCE_TASKS_AMOUNT,
-                    key as usize,
-                )?;
+                let timings = crate::tasks::run_map_task(&path, REDUCE_TASKS_AMOUNT, key as usize)?;
                 for (phase, time) in timings {
                     println!(
                         "[Time] Map task {} - Phase {}: {} seconds",
                         key, phase, time
                     );
                 }
+                std::fs::remove_file(path).ok();
                 Ok::<(), std::io::Error>(())
             })
             .await;
