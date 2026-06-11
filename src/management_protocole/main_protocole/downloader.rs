@@ -18,8 +18,7 @@ pub async fn download_file(url: &str, output_path: &str) -> Result<(), DownloadE
 
     let command_str = format!(
         "curl -L --retry 5 --retry-delay 3 -C - {} -o {}",
-        url,
-        output_path
+        url, output_path
     );
 
     if let Ok(c_command) = CString::new(command_str) {
@@ -29,7 +28,6 @@ pub async fn download_file(url: &str, output_path: &str) -> Result<(), DownloadE
             if status == 0 {
                 println!("Files successfully downloaded !");
                 Ok(())
-                
             } else {
                 println!("Error executing curl: {}", status);
                 Err(DownloadError::HTTPError)
