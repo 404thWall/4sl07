@@ -32,5 +32,5 @@ pub fn run_map_task_version(
 }
 
 pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
-    run_map_task_version(path, r, map_id, MapReduceVersion::Default)
+    run_map_task_version(path, r, map_id, MapReduceVersion::DefaultWithLanguageSplit)
 }

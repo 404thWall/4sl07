@@ -25,5 +25,5 @@ pub fn run_reduce_task_version(
 }
 
 pub fn run_reduce_task(directory_path: &str, reduce_id: usize) -> std::io::Result<()> {
-    run_reduce_task_version(directory_path, reduce_id, MapReduceVersion::Default)
+    run_reduce_task_version(directory_path, reduce_id, MapReduceVersion::DefaultWithLanguageSplit)
 }
