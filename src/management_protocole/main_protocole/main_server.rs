@@ -20,8 +20,8 @@ static REDUCE_TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock:
 
 static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<String>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![String::new(); MAP_TASKS_AMOUNT], 0)));
-static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
-    LazyLock::new(|| RwLock::new((vec![false; REDUCE_TASKS_AMOUNT], 0)));
+static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<String>, u32)>> =
+    LazyLock::new(|| RwLock::new((vec![String::new(); REDUCE_TASKS_AMOUNT], 0)));
 
 // Contains for each reduce task (key), the set of worker addresses that have the relevant map files
 // for this reduce task. Used to send the list of workers to the worker that will execute the reduce task.
@@ -255,8 +255,29 @@ impl ServerHandler for MainServer {
                     .await
                     .push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
             }
+            CURRENT_PHASE.store(ProtocolePhase::Map, atomic::Ordering::SeqCst);
+            RESULT_FILES_SENT.write().await.clear();
         }
         drop(finished_map_tasks);
+
+        let mut finished_reduce_tasks = REDUCE_TASKS_FINISHED.write().await;
+        for i in 0..REDUCE_TASKS_AMOUNT {
+            println!(
+                "Worker {} disconnected after having done Reduce task {}, marking it as unfinished",
+                addr, i
+            );
+            finished_reduce_tasks.0[i] = String::new();
+            finished_reduce_tasks.1 -= 1;
+            REDUCE_TASK_QUEUE
+                .write()
+                .await
+                .push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));
+            if CURRENT_PHASE.load(atomic::Ordering::SeqCst) != ProtocolePhase::Map {
+                CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+                RESULT_FILES_SENT.write().await.clear();
+            }
+        }
+        drop(finished_reduce_tasks);
 
         let in_progress = TASKS_IN_PROGRESS.read().await.get(&addr).cloned();
         if let Some(Some(task)) = in_progress {
@@ -402,13 +423,13 @@ async fn on_map_task_finished(
 
 async fn on_reduce_task_finished(
     key: u32,
-    _addr: SocketAddr,
+    addr: SocketAddr,
     task: Task,
     elapsed_time_millis: u128,
     tx: Sender<OutMsg>,
 ) {
     let mut tuple = REDUCE_TASKS_FINISHED.write().await; // (vec, count)
-    if tuple.0[key as usize] {
+    if !tuple.0[key as usize].is_empty() {
         println!(
             "Task Reduce {} was already marked as finished, ignoring",
             key
@@ -422,7 +443,7 @@ async fn on_reduce_task_finished(
     } else {
         println!("Marking Task Reduce {} as finished", key);
         AVERAGE_ELAPSED_REDUCE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-        tuple.0[key as usize] = true;
+        tuple.0[key as usize] = addr.to_string();
         tuple.1 += 1;
         let count = tuple.1;
         drop(tuple);
@@ -453,12 +474,19 @@ async fn on_reduce_task_finished(
 }
 
 async fn on_files_saved(addr: SocketAddr, elapsed_time_millis: u128, _tx: Sender<OutMsg>) {
-    RESULT_FILES_SENT.write().await.insert(addr.to_string());
-    AVERAGE_ELAPSED_SAVE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
     println!(
         "Received result files from {} in {} ms",
         addr, elapsed_time_millis
     );
+    // Return if the protocol phase has changed
+    let phase = CURRENT_PHASE.load(atomic::Ordering::SeqCst);
+    if phase != ProtocolePhase::SaveFiles && phase != ProtocolePhase::Finished {
+        println!("The current protocole phase has changed, the result was not accepted");
+        return;
+    }
+    
+    RESULT_FILES_SENT.write().await.insert(addr.to_string());
+    AVERAGE_ELAPSED_SAVE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
     println!(
         "Average elapsed time (ms) for all save files tasks: {}",
         AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
