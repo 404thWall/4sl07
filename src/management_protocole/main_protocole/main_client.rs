@@ -77,12 +77,14 @@ impl ClientHandler for MainClient {
                         user,
                         host_address,
                     )
-                    .await {
+                    .await
+                    {
                         eprintln!("Error executing a task: {}", e);
                         // TODO: maybe send a specific packet to the server to notify about the failure, so it can decide to retry or not
                         // Otherwise, we can disconnect, and the server will reassign the task to another client
                         tx.send(Packet::TaskAborted { task }).await.ok();
-                        tokio::time::sleep(Duration::from_secs(30 + rand::random_range(0..=15))).await;
+                        tokio::time::sleep(Duration::from_secs(30 + rand::random_range(0..=15)))
+                            .await;
                         tx.send(Packet::AskForTask).await.ok();
                     }
                 });
@@ -143,16 +145,18 @@ async fn do_task(
                                 .unwrap()
                         })
                         .await;
-                    let link = links
-                        .get((key as usize) % links.len())
-                        .unwrap();
+                    let link = links.get((key as usize) % links.len()).unwrap();
                     let path = format!("{}CC-MAIN-{}", crate::tasks::TMP_DIR, key);
                     downloader::get_commoncrawl_file(link, &path).await
                 })
             })
             .await
-            .or_else(|e| Err(ProtocolError::TaskFailed(format!("Map task {} download join error: {}", key, e))))?
-            .or_else(|e| Err(ProtocolError::TaskFailed(format!("Map task {} download error: {:?}", key, e))))?;
+            .map_err(|e| {
+                ProtocolError::TaskFailed(format!("Map task {} download join error: {}", key, e))
+            })?
+            .map_err(|e| {
+                ProtocolError::TaskFailed(format!("Map task {} download error: {:?}", key, e))
+            })?;
 
             println!(
                 "File downloaded for Map task {} in {:?}",
@@ -185,12 +189,18 @@ async fn do_task(
                 Ok(Err(e)) => {
                     eprintln!("Map task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return Err(ProtocolError::TaskFailed(format!("Map task {} failed: {}", key, e)));
+                    return Err(ProtocolError::TaskFailed(format!(
+                        "Map task {} failed: {}",
+                        key, e
+                    )));
                 }
                 Err(e) => {
                     eprintln!("Map task {} join error: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return Err(ProtocolError::TaskFailed(format!("Map task {} join error: {}", key, e)));
+                    return Err(ProtocolError::TaskFailed(format!(
+                        "Map task {} join error: {}",
+                        key, e
+                    )));
                 }
             };
 
@@ -249,16 +259,28 @@ async fn do_task(
                 for res in joined_results {
                     if let Err(e) = res {
                         eprintln!("Error in Reduce task {}: {}", key, e);
-                        return Err(ProtocolError::TaskFailed(format!("Reduce task {} error: {}", key, e)));
+                        return Err(ProtocolError::TaskFailed(format!(
+                            "Reduce task {} error: {}",
+                            key, e
+                        )));
                     } else if let Err(e) = res.unwrap() {
                         match e {
                             ProtocolError::ClosingConnection => {
                                 // This error is expected when the file transfer is done, so we can ignore it
-                                println!("File transfer completed for Reduce task {}, closing connection", key);
+                                println!(
+                                    "File transfer completed for Reduce task {}, closing connection",
+                                    key
+                                );
                             }
                             _ => {
-                                eprintln!("Connection Protocole Error in Reduce task {}: {}", key, e);
-                                return Err(ProtocolError::TaskFailed(format!("Reduce task {} connection protocole error: {}", key, e)));
+                                eprintln!(
+                                    "Connection Protocole Error in Reduce task {}: {}",
+                                    key, e
+                                );
+                                return Err(ProtocolError::TaskFailed(format!(
+                                    "Reduce task {} connection protocole error: {}",
+                                    key, e
+                                )));
                             }
                         }
                     }
@@ -287,12 +309,18 @@ async fn do_task(
                 Ok(Err(e)) => {
                     eprintln!("Reduce task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return Err(ProtocolError::TaskFailed(format!("Reduce task {} failed: {}", key, e)));
+                    return Err(ProtocolError::TaskFailed(format!(
+                        "Reduce task {} failed: {}",
+                        key, e
+                    )));
                 }
                 Err(e) => {
                     eprintln!("Reduce task {} join error: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
-                    return Err(ProtocolError::TaskFailed(format!("Reduce task {} join error: {}", key, e)));
+                    return Err(ProtocolError::TaskFailed(format!(
+                        "Reduce task {} join error: {}",
+                        key, e
+                    )));
                 }
             }
             let elapsed_time_millis = begin_time.elapsed().as_millis();

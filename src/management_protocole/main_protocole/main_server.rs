@@ -126,12 +126,16 @@ impl ServerHandler for MainServer {
             }
             Packet::AskForTask => {
                 //  println!("Received AskForTask from {}", addr);
-                let mut queue = if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Map {
-                    MAP_TASK_QUEUE.write().await
-                } else {
-                    REDUCE_TASK_QUEUE.write().await
-                };
-                MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
+                let mut queue =
+                    if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Map {
+                        MAP_TASK_QUEUE.write().await
+                    } else {
+                        REDUCE_TASK_QUEUE.write().await
+                    };
+                MAP_TASKS_IN_PROGRESS
+                    .write()
+                    .await
+                    .insert(addr.to_string(), None);
                 if queue.is_empty() {
                     if RESULT_FILES_SENT.read().await.len()
                         == CONNECTED_FILE_PORT.read().await.len()
@@ -206,18 +210,27 @@ impl ServerHandler for MainServer {
                 match task {
                     Task::Map(key, _) => {
                         let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
-                        
+
                         // Remove the task from the in progress map if the worker has not been reassigned another task since then
                         println!("Removing Map task {} in progress for worker {}", key, addr);
                         let mut current_map_tasks_in_progress = MAP_TASKS_IN_PROGRESS.write().await;
-                        if let Some(Some(current_key)) = current_map_tasks_in_progress.get(&addr.to_string()) && *current_key == key {
+                        if let Some(Some(current_key)) =
+                            current_map_tasks_in_progress.get(&addr.to_string())
+                            && *current_key == key
+                        {
                             current_map_tasks_in_progress.insert(addr.to_string(), None);
                         }
-                        println!("Current tasks in progress: {:?}", current_map_tasks_in_progress);
+                        println!(
+                            "Current tasks in progress: {:?}",
+                            current_map_tasks_in_progress
+                        );
                         drop(current_map_tasks_in_progress);
 
                         if !tuple.0[key as usize].is_empty() {
-                            println!("Task Map {} was already marked as finished by {}, ignoring", key, tuple.0[key as usize]);
+                            println!(
+                                "Task Map {} was already marked as finished by {}, ignoring",
+                                key, tuple.0[key as usize]
+                            );
                             tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
                                 validated: false,
                                 task,
@@ -260,7 +273,8 @@ impl ServerHandler for MainServer {
                             if count == MAP_TASKS_AMOUNT as u32 {
                                 println!("All Map tasks finished, generating Reduce tasks...");
                                 generate_reduce_tasks().await;
-                                CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+                                CURRENT_PHASE
+                                    .store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
                             }
                         }
                     }
@@ -294,7 +308,8 @@ impl ServerHandler for MainServer {
                             .ok();
 
                             if count == REDUCE_TASKS_AMOUNT as u32 {
-                                CURRENT_PHASE.store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
+                                CURRENT_PHASE
+                                    .store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
                                 println!("===============================");
                                 println!("All Reduce tasks finished");
                                 println!(
@@ -324,8 +339,12 @@ impl ServerHandler for MainServer {
                             AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
                                 / RESULT_FILES_SENT.read().await.len() as u64
                         );
-                        if RESULT_FILES_SENT.read().await.len() == CONNECTED_FILE_PORT.read().await.len() {
-                            println!("All result files have been sent, sending Finished task to all workers...");
+                        if RESULT_FILES_SENT.read().await.len()
+                            == CONNECTED_FILE_PORT.read().await.len()
+                        {
+                            println!(
+                                "All result files have been sent, sending Finished task to all workers..."
+                            );
                             CURRENT_PHASE.store(ProtocolePhase::Finished, atomic::Ordering::SeqCst);
                         }
                     }
@@ -344,14 +363,29 @@ impl ServerHandler for MainServer {
                 println!("Received TaskAborted from {} for task: {:?}", addr, task);
                 match task {
                     Task::Map(key, _) => {
-                        println!("Re-queuing Map task {} since it was aborted by {}", key, addr);
-                        MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
-                        MAP_TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
+                        println!(
+                            "Re-queuing Map task {} since it was aborted by {}",
+                            key, addr
+                        );
+                        MAP_TASKS_IN_PROGRESS
+                            .write()
+                            .await
+                            .insert(addr.to_string(), None);
+                        MAP_TASK_QUEUE
+                            .write()
+                            .await
+                            .push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
                     }
                     Task::Reduce(key, _) => {
-                        println!("Re-queuing Reduce task {} since it was aborted by {}", key, addr);
+                        println!(
+                            "Re-queuing Reduce task {} since it was aborted by {}",
+                            key, addr
+                        );
                         // REDUCE_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
-                        REDUCE_TASK_QUEUE.write().await.push(Task::Reduce(key, REDUCE_TASKS_AMOUNT as u32));
+                        REDUCE_TASK_QUEUE
+                            .write()
+                            .await
+                            .push(Task::Reduce(key, REDUCE_TASKS_AMOUNT as u32));
                     }
                     _ => {}
                 }
@@ -372,48 +406,63 @@ impl ServerHandler for MainServer {
         println!("Ping task for {} stopped", addr);
 
         if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Finished {
-            println!("Worker {} disconnected after the protocole is finished, ignoring", addr);
+            println!(
+                "Worker {} disconnected after the protocole is finished, ignoring",
+                addr
+            );
             return Ok(());
         }
-        
+
         // Mark any map task assigned to this worker as unfinished so that it can be reassigned to another worker
         let mut finished_map_tasks = MAP_TASKS_FINISHED.write().await;
         for i in 0..MAP_TASKS_AMOUNT {
             if finished_map_tasks.0[i] == addr {
-                println!("Worker {} disconnected after having done Map task {}, marking it as unfinished", addr, i);
+                println!(
+                    "Worker {} disconnected after having done Map task {}, marking it as unfinished",
+                    addr, i
+                );
                 finished_map_tasks.0[i] = String::new();
                 finished_map_tasks.1 -= 1;
-                MAP_TASK_QUEUE.write().await.push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
+                MAP_TASK_QUEUE
+                    .write()
+                    .await
+                    .push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
             }
         }
         drop(finished_map_tasks);
-        
+
         let in_progress = MAP_TASKS_IN_PROGRESS.read().await.get(&addr).cloned();
         if let Some(Some(key)) = in_progress {
-            println!("Worker {} disconnected during Map task {}, marking it as unfinished", addr, key);
-            MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
-            MAP_TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
+            println!(
+                "Worker {} disconnected during Map task {}, marking it as unfinished",
+                addr, key
+            );
+            MAP_TASKS_IN_PROGRESS
+                .write()
+                .await
+                .insert(addr.to_string(), None);
+            MAP_TASK_QUEUE
+                .write()
+                .await
+                .push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
         }
 
         let mut map_result_files = MAP_RESULT_FILES.write().await;
         for (reduce_key, set) in map_result_files.iter_mut() {
             if set.remove(&addr) {
-                println!("Worker {} had result files for Reduce task {}, removing it from the list of workers for this task", addr, reduce_key);
+                println!(
+                    "Worker {} had result files for Reduce task {}, removing it from the list of workers for this task",
+                    addr, reduce_key
+                );
             }
         }
         drop(map_result_files);
 
         // Remove the worker from the connected workers
-        CONNECTED_FILE_PORT
-            .write()
-            .await
-            .remove(&addr);
+        CONNECTED_FILE_PORT.write().await.remove(&addr);
 
         // Remove the worker from the result files sent
-        RESULT_FILES_SENT
-            .write()
-            .await
-            .remove(&addr);
+        RESULT_FILES_SENT.write().await.remove(&addr);
 
         // If there are no more connected workers, stop the server
         if CONNECTED_FILE_PORT.read().await.is_empty() {

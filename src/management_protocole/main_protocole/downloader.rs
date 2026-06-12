@@ -55,7 +55,9 @@ pub async fn list_commoncrawl_files(tmp_dir: &str) -> Result<Vec<String>, Downlo
     let output_path = format!("{}wet.paths.gz", tmp_dir);
     let dest = format!("{}wet.paths", tmp_dir);
     download_file(url, &output_path).await?;
-    unzip_file(&output_path, &dest).await.map_err(DownloadError::UnzipError)?;
+    unzip_file(&output_path, &dest)
+        .await
+        .map_err(DownloadError::UnzipError)?;
     std::fs::remove_file(&output_path).map_err(DownloadError::IOError)?;
 
     let file_bytes = fs::read(&dest).map_err(DownloadError::IOError)?;
@@ -76,7 +78,9 @@ pub async fn get_commoncrawl_file(link: &str, output_name: &str) -> Result<Strin
     let dest = format!("{}.warc.wet", output_name);
 
     download_file(&url, &gz_file).await?;
-    unzip_file(&gz_file, &dest).await.map_err(DownloadError::UnzipError)?;
+    unzip_file(&gz_file, &dest)
+        .await
+        .map_err(DownloadError::UnzipError)?;
     std::fs::remove_file(&gz_file).map_err(DownloadError::IOError)?;
 
     Ok(dest)
