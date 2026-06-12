@@ -405,11 +405,35 @@ impl ServerHandler for MainServer {
         }
         println!("Ping task for {} stopped", addr);
 
+        // Remove the worker from the connected workers
+        CONNECTED_FILE_PORT.write().await.remove(&addr);
+        println!("Worker {} removed from connected workers", addr);
+
         if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Finished {
             println!(
                 "Worker {} disconnected after the protocole is finished, ignoring",
                 addr
             );
+
+            // If there are no more connected workers, stop the server
+            if CONNECTED_FILE_PORT.read().await.is_empty() {
+                println!("================================");
+                println!("All workers disconnected, stopping server...");
+                let elapsed_time = MAIN_TIME.elapsed();
+                println!("Total elapsed time: {:?}", elapsed_time);
+                println!(
+                    "Average elapsed time (ms) for all map tasks: {}",
+                    AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst) / MAP_TASKS_AMOUNT as u64
+                );
+                println!(
+                    "Average elapsed time (ms) for all reduce tasks: {}",
+                    AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
+                        / REDUCE_TASKS_AMOUNT as u64
+                );
+                println!("================================");
+                std::process::exit(0);
+            }
+
             return Ok(());
         }
 
@@ -458,30 +482,8 @@ impl ServerHandler for MainServer {
         }
         drop(map_result_files);
 
-        // Remove the worker from the connected workers
-        CONNECTED_FILE_PORT.write().await.remove(&addr);
-
         // Remove the worker from the result files sent
         RESULT_FILES_SENT.write().await.remove(&addr);
-
-        // If there are no more connected workers, stop the server
-        if CONNECTED_FILE_PORT.read().await.is_empty() {
-            println!("================================");
-            println!("All workers disconnected, stopping server...");
-            let elapsed_time = MAIN_TIME.elapsed();
-            println!("Total elapsed time: {:?}", elapsed_time);
-            println!(
-                "Average elapsed time (ms) for all map tasks: {}",
-                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst) / MAP_TASKS_AMOUNT as u64
-            );
-            println!(
-                "Average elapsed time (ms) for all reduce tasks: {}",
-                AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
-                    / REDUCE_TASKS_AMOUNT as u64
-            );
-            println!("================================");
-            std::process::exit(0);
-        }
         Ok(())
     }
 }
