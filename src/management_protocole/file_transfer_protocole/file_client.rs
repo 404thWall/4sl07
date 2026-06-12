@@ -11,6 +11,7 @@ pub struct FileClient {
     file_content: Option<Vec<u8>>,
     key: u32,
     count: u32,
+    stopped: bool,
 }
 
 impl FileClient {
@@ -21,6 +22,7 @@ impl FileClient {
             file_content: None,
             key,
             count: 0,
+            stopped: false,
         }
     }
 }
@@ -76,6 +78,7 @@ impl ClientHandler for FileClient {
                     self.begin_time.unwrap().elapsed()
                 );
                 println!("All files received, closing connection");
+                self.stopped = true;
                 Err(ProtocolError::ClosingConnection)
             }
             _ => Err(ProtocolError::UnexpectedPacket(packet)),
@@ -83,7 +86,12 @@ impl ClientHandler for FileClient {
     }
 
     async fn on_connection_ended(&mut self, _tx: Sender<Packet>) -> Result<(), ProtocolError> {
-        Ok(())
+        // Maybe add something here to abort the task when the communication is unexpectedly stopped
+        if self.stopped {
+            Ok(())
+        } else {
+            Err(ProtocolError::UnexpectedConnectionClosed(None))
+        }
     }
 }
 

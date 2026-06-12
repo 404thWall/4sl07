@@ -55,7 +55,7 @@ pub async fn start_client(addr: &str, mut client: impl ClientHandler) -> Result<
         }
     }
 
-    client.on_connection_ended(tx.clone()).await.ok();
+    client.on_connection_ended(tx.clone()).await?;
     drop(tx);
     let _ = writer_task.await;
 

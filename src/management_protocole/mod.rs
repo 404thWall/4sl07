@@ -73,6 +73,8 @@ pub enum ProtocolError {
     ClosingConnection,
     #[error("Task failed: {0}")]
     TaskFailed(String),
+    #[error("The connection was unexpectedly closed for reason: {0:?}")]
+    UnexpectedConnectionClosed(Option<String>),
 }
 
 const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16 MB limit
