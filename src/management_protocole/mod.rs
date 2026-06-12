@@ -40,6 +40,9 @@ pub enum Packet {
     AllFilesSent,
     ConnectedWorkersList(Vec<(String, u16)>), // List of (IP, port) of connected workers
     AskWorkersList,
+    TaskAborted {
+        task: Task,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +202,10 @@ impl Encoder<Packet> for CommandCodec {
             Packet::TaskValidation { validated, task } => {
                 payload.put_u8(0x0C); // Message type: TaskValidated
                 payload.put_u8(if validated { 1 } else { 0 });
+                encode_task(&task, &mut payload);
+            }
+            Packet::TaskAborted { task } => {
+                payload.put_u8(0x0D); // Message type: TaskAborted
                 encode_task(&task, &mut payload);
             }
         }
@@ -370,6 +377,10 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
             let validated = payload[0] != 0;
             let task = decode_task(&payload[1..])?;
             Ok(Some(Packet::TaskValidation { validated, task }))
+        }
+        0x0D => {
+            let task = decode_task(payload)?;
+            Ok(Some(Packet::TaskAborted { task }))
         }
         _ => Err(ProtocolError::InvalidMessageType(msg_type)),
     }

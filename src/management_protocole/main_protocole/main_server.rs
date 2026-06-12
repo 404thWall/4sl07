@@ -14,7 +14,10 @@ static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static LAST_RECEIVED_PING: LazyLock<RwLock<HashMap<String, u32>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
+
+static MAP_TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
+static REDUCE_TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
+
 static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<String>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![String::new(); MAP_TASKS_AMOUNT], 0)));
 static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
@@ -123,7 +126,11 @@ impl ServerHandler for MainServer {
             }
             Packet::AskForTask => {
                 //  println!("Received AskForTask from {}", addr);
-                let mut queue = TASK_QUEUE.write().await;
+                let mut queue = if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Map {
+                    MAP_TASK_QUEUE.write().await
+                } else {
+                    REDUCE_TASK_QUEUE.write().await
+                };
                 MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
                 if queue.is_empty() {
                     if RESULT_FILES_SENT.read().await.len()
@@ -333,6 +340,23 @@ impl ServerHandler for MainServer {
                     list.into_iter().collect(),
                 )))
             }
+            Packet::TaskAborted { task } => {
+                println!("Received TaskAborted from {} for task: {:?}", addr, task);
+                match task {
+                    Task::Map(key, _) => {
+                        println!("Re-queuing Map task {} since it was aborted by {}", key, addr);
+                        MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
+                        MAP_TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
+                    }
+                    Task::Reduce(key, _) => {
+                        println!("Re-queuing Reduce task {} since it was aborted by {}", key, addr);
+                        // REDUCE_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
+                        REDUCE_TASK_QUEUE.write().await.push(Task::Reduce(key, REDUCE_TASKS_AMOUNT as u32));
+                    }
+                    _ => {}
+                }
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }
@@ -359,7 +383,7 @@ impl ServerHandler for MainServer {
                 println!("Worker {} disconnected after having done Map task {}, marking it as unfinished", addr, i);
                 finished_map_tasks.0[i] = String::new();
                 finished_map_tasks.1 -= 1;
-                TASK_QUEUE.write().await.push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
+                MAP_TASK_QUEUE.write().await.push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
             }
         }
         drop(finished_map_tasks);
@@ -368,7 +392,7 @@ impl ServerHandler for MainServer {
         if let Some(Some(key)) = in_progress {
             println!("Worker {} disconnected during Map task {}, marking it as unfinished", addr, key);
             MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
-            TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
+            MAP_TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
         }
 
         let mut map_result_files = MAP_RESULT_FILES.write().await;
@@ -444,7 +468,7 @@ async fn server_ping_task(tx: &mut Sender<OutMsg>, addr: &std::net::SocketAddr) 
 }
 
 async fn generate_map_tasks() {
-    let mut tasks = TASK_QUEUE.write().await;
+    let mut tasks = MAP_TASK_QUEUE.write().await;
 
     for i in 0..MAP_TASKS_AMOUNT {
         tasks.push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
@@ -452,7 +476,7 @@ async fn generate_map_tasks() {
 }
 
 async fn generate_reduce_tasks() {
-    let mut tasks = TASK_QUEUE.write().await;
+    let mut tasks = REDUCE_TASK_QUEUE.write().await;
 
     for i in 0..REDUCE_TASKS_AMOUNT {
         tasks.push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));

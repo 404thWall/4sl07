@@ -69,7 +69,7 @@ impl ClientHandler for MainClient {
                 let host_address = self.host_address.clone();
                 tokio::spawn(async move {
                     if let Err(e) = do_task(
-                        task,
+                        task.clone(),
                         tx.clone(),
                         connected_clients,
                         file_server_port,
@@ -81,6 +81,9 @@ impl ClientHandler for MainClient {
                         eprintln!("Error executing a task: {}", e);
                         // TODO: maybe send a specific packet to the server to notify about the failure, so it can decide to retry or not
                         // Otherwise, we can disconnect, and the server will reassign the task to another client
+                        tx.send(Packet::TaskAborted { task }).await.ok();
+                        tokio::time::sleep(Duration::from_secs(30 + rand::random_range(0..=15))).await;
+                        tx.send(Packet::AskForTask).await.ok();
                     }
                 });
                 println!("Launched task in background");
