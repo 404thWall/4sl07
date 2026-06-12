@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use crate::management_protocole::server::{OutMsg, ServerHandler};
 use crate::management_protocole::{Packet, ProtocolError, Task};
+use atomic_enum::atomic_enum;
 use tokio::sync::mpsc::Sender;
 
 use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT};
@@ -37,6 +38,16 @@ static MAIN_TIME: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instan
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_SAVE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
+static CURRENT_PHASE: AtomicProtocolePhase = AtomicProtocolePhase::new(ProtocolePhase::Map);
+
+#[atomic_enum]
+#[derive(PartialEq, Eq)]
+pub enum ProtocolePhase {
+    Map,
+    Reduce,
+    SaveFiles,
+    Finished,
+}
 
 pub struct MainServer {
     ping_task: Option<tokio::task::JoinHandle<()>>,
@@ -242,6 +253,7 @@ impl ServerHandler for MainServer {
                             if count == MAP_TASKS_AMOUNT as u32 {
                                 println!("All Map tasks finished, generating Reduce tasks...");
                                 generate_reduce_tasks().await;
+                                CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
                             }
                         }
                     }
@@ -275,6 +287,7 @@ impl ServerHandler for MainServer {
                             .ok();
 
                             if count == REDUCE_TASKS_AMOUNT as u32 {
+                                CURRENT_PHASE.store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
                                 println!("===============================");
                                 println!("All Reduce tasks finished");
                                 println!(
@@ -304,6 +317,10 @@ impl ServerHandler for MainServer {
                             AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
                                 / RESULT_FILES_SENT.read().await.len() as u64
                         );
+                        if RESULT_FILES_SENT.read().await.len() == CONNECTED_FILE_PORT.read().await.len() {
+                            println!("All result files have been sent, sending Finished task to all workers...");
+                            CURRENT_PHASE.store(ProtocolePhase::Finished, atomic::Ordering::SeqCst);
+                        }
                     }
                     _ => {}
                 }
@@ -329,6 +346,11 @@ impl ServerHandler for MainServer {
             task.abort();
         }
         println!("Ping task for {} stopped", addr);
+
+        if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Finished {
+            println!("Worker {} disconnected after the protocole is finished, ignoring", addr);
+            return Ok(());
+        }
         
         // Mark any map task assigned to this worker as unfinished so that it can be reassigned to another worker
         let mut finished_map_tasks = MAP_TASKS_FINISHED.write().await;
