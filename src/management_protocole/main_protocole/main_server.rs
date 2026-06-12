@@ -125,77 +125,7 @@ impl ServerHandler for MainServer {
                 Ok(None)
             }
             Packet::AskForTask => {
-                //  println!("Received AskForTask from {}", addr);
-                let mut queue =
-                    if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Map {
-                        MAP_TASK_QUEUE.write().await
-                    } else {
-                        REDUCE_TASK_QUEUE.write().await
-                    };
-                MAP_TASKS_IN_PROGRESS
-                    .write()
-                    .await
-                    .insert(addr.to_string(), None);
-                if queue.is_empty() {
-                    if RESULT_FILES_SENT.read().await.len()
-                        == CONNECTED_FILE_PORT.read().await.len()
-                    {
-                        println!(
-                            "All result files have been sent, sending Finished task to {}",
-                            addr
-                        );
-                        return Ok(Some(Packet::GiveTask {
-                            task: Task::Finished,
-                            files_hosts: Vec::new(),
-                        }));
-                    }
-                    if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32
-                        && !RESULT_FILES_SENT.read().await.contains(&addr.to_string())
-                    {
-                        println!("All tasks are finished, sending SaveFiles to {}", addr);
-                        return Ok(Some(Packet::GiveTask {
-                            task: Task::SaveFiles,
-                            files_hosts: Vec::new(),
-                        }));
-                    }
-                    //println!("No more tasks available for {}, sending None", addr);
-                    return Ok(Some(Packet::GiveTask {
-                        task: Task::None,
-                        files_hosts: Vec::new(),
-                    }));
-                }
-                let task = queue.swap_remove(0);
-                let files_hosts = if let Task::Reduce(key, _) = task {
-                    let list = CONNECTED_FILE_PORT.read().await.clone();
-                    println!(
-                        "Map result files for Reduce task {}: {:?}",
-                        key,
-                        MAP_RESULT_FILES.read().await.get(&key)
-                    );
-                    tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(
-                        list.into_iter().collect(),
-                    )))
-                    .await
-                    .ok();
-                    MAP_RESULT_FILES
-                        .read()
-                        .await
-                        .get(&key)
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .collect()
-                } else {
-                    if let Task::Map(key, _) = task {
-                        MAP_TASKS_IN_PROGRESS
-                            .write()
-                            .await
-                            .insert(addr.to_string(), Some(key));
-                    }
-                    vec![]
-                };
-                println!("Assigning task {:?} to {}", task, addr);
-                Ok(Some(Packet::GiveTask { task, files_hosts }))
+                on_ask_for_task(addr, tx).await
             }
             Packet::TaskFinished {
                 task,
@@ -209,144 +139,13 @@ impl ServerHandler for MainServer {
                 );
                 match task {
                     Task::Map(key, _) => {
-                        let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
-
-                        // Remove the task from the in progress map if the worker has not been reassigned another task since then
-                        println!("Removing Map task {} in progress for worker {}", key, addr);
-                        let mut current_map_tasks_in_progress = MAP_TASKS_IN_PROGRESS.write().await;
-                        if let Some(Some(current_key)) =
-                            current_map_tasks_in_progress.get(&addr.to_string())
-                            && *current_key == key
-                        {
-                            current_map_tasks_in_progress.insert(addr.to_string(), None);
-                        }
-                        println!(
-                            "Current tasks in progress: {:?}",
-                            current_map_tasks_in_progress
-                        );
-                        drop(current_map_tasks_in_progress);
-
-                        if !tuple.0[key as usize].is_empty() {
-                            println!(
-                                "Task Map {} was already marked as finished by {}, ignoring",
-                                key, tuple.0[key as usize]
-                            );
-                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
-                                validated: false,
-                                task,
-                            }))
-                            .await
-                            .ok();
-                        } else {
-                            println!("Marking Task Map {} as finished", key);
-
-                            // Add the elapsed time for this map task to the average
-                            AVERAGE_ELAPSED_MAP_TIME
-                                .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-
-                            // Mark the map task as finished globally
-                            tuple.0[key as usize] = addr.to_string();
-                            tuple.1 += 1;
-                            let count = tuple.1;
-                            drop(tuple);
-
-                            println!(
-                                "Storing resulting files for Map task {}: {:?}",
-                                key, reduce_files
-                            );
-                            let mut map = MAP_RESULT_FILES.write().await;
-                            for reduce_key in reduce_files {
-                                if let Some(set) = map.get_mut(&reduce_key) {
-                                    set.insert(addr.to_string());
-                                } else {
-                                    map.insert(reduce_key, HashSet::from([addr.to_string()]));
-                                }
-                            }
-
-                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
-                                validated: true,
-                                task,
-                            }))
-                            .await
-                            .ok();
-
-                            if count == MAP_TASKS_AMOUNT as u32 {
-                                println!("All Map tasks finished, generating Reduce tasks...");
-                                generate_reduce_tasks().await;
-                                CURRENT_PHASE
-                                    .store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
-                            }
-                        }
+                        on_map_task_finished(key, addr, task, elapsed_time_millis, tx.clone(), reduce_files).await
                     }
                     Task::Reduce(key, _) => {
-                        let mut tuple = REDUCE_TASKS_FINISHED.write().await; // (vec, count)
-                        if tuple.0[key as usize] {
-                            println!(
-                                "Task Reduce {} was already marked as finished, ignoring",
-                                key
-                            );
-                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
-                                validated: false,
-                                task,
-                            }))
-                            .await
-                            .ok();
-                        } else {
-                            println!("Marking Task Reduce {} as finished", key);
-                            AVERAGE_ELAPSED_REDUCE_TIME
-                                .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-                            tuple.0[key as usize] = true;
-                            tuple.1 += 1;
-                            let count = tuple.1;
-                            drop(tuple);
-
-                            tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
-                                validated: true,
-                                task,
-                            }))
-                            .await
-                            .ok();
-
-                            if count == REDUCE_TASKS_AMOUNT as u32 {
-                                CURRENT_PHASE
-                                    .store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
-                                println!("===============================");
-                                println!("All Reduce tasks finished");
-                                println!(
-                                    "Average elapsed time (ms) for all map tasks: {}",
-                                    AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst)
-                                        / MAP_TASKS_AMOUNT as u64
-                                );
-                                println!(
-                                    "Average elapsed time (ms) for all reduce tasks: {}",
-                                    AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
-                                        / REDUCE_TASKS_AMOUNT as u64
-                                );
-                                println!("===============================");
-                            }
-                        }
+                        on_reduce_task_finished(key, addr, task, elapsed_time_millis, tx.clone()).await
                     }
                     Task::SaveFiles => {
-                        RESULT_FILES_SENT.write().await.insert(addr.to_string());
-                        AVERAGE_ELAPSED_SAVE_TIME
-                            .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-                        println!(
-                            "Received result files from {} in {} ms",
-                            addr, elapsed_time_millis
-                        );
-                        println!(
-                            "Average elapsed time (ms) for all save files tasks: {}",
-                            AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
-                                / RESULT_FILES_SENT.read().await.len() as u64
-                        );
-                        if RESULT_FILES_SENT.read().await.len()
-                            == CONNECTED_FILE_PORT.read().await.len()
-                        {
-                            println!(
-                                "All result files have been sent, sending Finished task to all workers..."
-                            );
-                            CURRENT_PHASE.store(ProtocolePhase::Finished, atomic::Ordering::SeqCst);
-                        }
+                        on_files_saved(addr, elapsed_time_millis, tx.clone()).await
                     }
                     _ => {}
                 }
@@ -534,4 +333,222 @@ async fn generate_reduce_tasks() {
     }
 
     println!("Tasks in queue: {}", tasks.len());
+}
+
+async fn on_map_task_finished(key: u32, addr: SocketAddr, task: Task, elapsed_time_millis: u128, tx: Sender<OutMsg>, reduce_files: Vec<u32>) {
+    let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
+
+    // Remove the task from the in progress map if the worker has not been reassigned another task since then
+    println!("Removing Map task {} in progress for worker {}", key, addr);
+    let mut current_map_tasks_in_progress = MAP_TASKS_IN_PROGRESS.write().await;
+    if let Some(Some(current_key)) =
+        current_map_tasks_in_progress.get(&addr.to_string())
+        && *current_key == key
+    {
+        current_map_tasks_in_progress.insert(addr.to_string(), None);
+    }
+    println!(
+        "Current tasks in progress: {:?}",
+        current_map_tasks_in_progress
+    );
+    drop(current_map_tasks_in_progress);
+
+    if !tuple.0[key as usize].is_empty() {
+        println!(
+            "Task Map {} was already marked as finished by {}, ignoring",
+            key, tuple.0[key as usize]
+        );
+        tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
+            validated: false,
+            task,
+        }))
+        .await
+        .ok();
+    } else {
+        println!("Marking Task Map {} as finished", key);
+
+        // Add the elapsed time for this map task to the average
+        AVERAGE_ELAPSED_MAP_TIME
+            .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
+
+        // Mark the map task as finished globally
+        tuple.0[key as usize] = addr.to_string();
+        tuple.1 += 1;
+        let count = tuple.1;
+        drop(tuple);
+
+        println!(
+            "Storing resulting files for Map task {}: {:?}",
+            key, reduce_files
+        );
+        let mut map = MAP_RESULT_FILES.write().await;
+        for reduce_key in reduce_files {
+            if let Some(set) = map.get_mut(&reduce_key) {
+                set.insert(addr.to_string());
+            } else {
+                map.insert(reduce_key, HashSet::from([addr.to_string()]));
+            }
+        }
+
+        tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
+            validated: true,
+            task,
+        }))
+        .await
+        .ok();
+
+        if count == MAP_TASKS_AMOUNT as u32 {
+            println!("All Map tasks finished, generating Reduce tasks...");
+            generate_reduce_tasks().await;
+            CURRENT_PHASE
+                .store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+        }
+    }
+}
+
+async fn on_reduce_task_finished(key: u32, _addr: SocketAddr, task: Task, elapsed_time_millis: u128, tx: Sender<OutMsg>) {
+    let mut tuple = REDUCE_TASKS_FINISHED.write().await; // (vec, count)
+    if tuple.0[key as usize] {
+        println!(
+            "Task Reduce {} was already marked as finished, ignoring",
+            key
+        );
+        tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
+            validated: false,
+            task,
+        }))
+        .await
+        .ok();
+    } else {
+        println!("Marking Task Reduce {} as finished", key);
+        AVERAGE_ELAPSED_REDUCE_TIME
+            .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
+        tuple.0[key as usize] = true;
+        tuple.1 += 1;
+        let count = tuple.1;
+        drop(tuple);
+
+        tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
+            validated: true,
+            task,
+        }))
+        .await
+        .ok();
+
+        if count == REDUCE_TASKS_AMOUNT as u32 {
+            CURRENT_PHASE
+                .store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
+            println!("===============================");
+            println!("All Reduce tasks finished");
+            println!(
+                "Average elapsed time (ms) for all map tasks: {}",
+                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst)
+                    / MAP_TASKS_AMOUNT as u64
+            );
+            println!(
+                "Average elapsed time (ms) for all reduce tasks: {}",
+                AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
+                    / REDUCE_TASKS_AMOUNT as u64
+            );
+            println!("===============================");
+        }
+    }
+}
+
+async fn on_files_saved(addr: SocketAddr, elapsed_time_millis: u128, _tx: Sender<OutMsg>) {
+    RESULT_FILES_SENT.write().await.insert(addr.to_string());
+    AVERAGE_ELAPSED_SAVE_TIME
+        .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
+    println!(
+        "Received result files from {} in {} ms",
+        addr, elapsed_time_millis
+    );
+    println!(
+        "Average elapsed time (ms) for all save files tasks: {}",
+        AVERAGE_ELAPSED_SAVE_TIME.load(atomic::Ordering::SeqCst)
+            / RESULT_FILES_SENT.read().await.len() as u64
+    );
+    if RESULT_FILES_SENT.read().await.len()
+        == CONNECTED_FILE_PORT.read().await.len()
+    {
+        println!(
+            "All result files have been sent, sending Finished task to all workers..."
+        );
+        // TODO Broadcast end message here instead of waiting for workers to ask for task again
+    }
+}
+
+async fn on_ask_for_task(addr: SocketAddr, tx: Sender<OutMsg>) -> Result<Option<Packet>, ProtocolError> {
+    //  println!("Received AskForTask from {}", addr);
+    let mut queue =
+        if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Map {
+            MAP_TASK_QUEUE.write().await
+        } else {
+            REDUCE_TASK_QUEUE.write().await
+        };
+    MAP_TASKS_IN_PROGRESS
+        .write()
+        .await
+        .insert(addr.to_string(), None);
+    if queue.is_empty() {
+        if RESULT_FILES_SENT.read().await.len()
+            == CONNECTED_FILE_PORT.read().await.len()
+        {
+            CURRENT_PHASE.store(ProtocolePhase::Finished, atomic::Ordering::SeqCst);
+            println!(
+                "All result files have been sent, sending Finished task to {}",
+                addr
+            );
+            return Ok(Some(Packet::GiveTask {
+                task: Task::Finished,
+                files_hosts: Vec::new(),
+            }));
+        }
+        if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32
+            && !RESULT_FILES_SENT.read().await.contains(&addr.to_string())
+        {
+            println!("All tasks are finished, sending SaveFiles to {}", addr);
+            return Ok(Some(Packet::GiveTask {
+                task: Task::SaveFiles,
+                files_hosts: Vec::new(),
+            }));
+        }
+        //println!("No more tasks available for {}, sending None", addr);
+        return Ok(Some(Packet::GiveTask {
+            task: Task::None,
+            files_hosts: Vec::new(),
+        }));
+    }
+    let task = queue.swap_remove(0);
+    let files_hosts = if let Task::Reduce(key, _) = task {
+        let list = CONNECTED_FILE_PORT.read().await.clone();
+        println!(
+            "Map result files for Reduce task {}: {:?}",
+            key,
+            MAP_RESULT_FILES.read().await.get(&key)
+        );
+        tx.send(OutMsg::MsgPacket(Packet::ConnectedWorkersList(
+            list.into_iter().collect(),
+        )))
+        .await
+        .ok();
+        MAP_RESULT_FILES
+            .read()
+            .await
+            .get(&key)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
+    } else {
+        if let Task::Map(key, _) = task {
+            MAP_TASKS_IN_PROGRESS
+                .write()
+                .await
+                .insert(addr.to_string(), Some(key));
+        }
+        vec![]
+    };
+    println!("Assigning task {:?} to {}", task, addr);
+    Ok(Some(Packet::GiveTask { task, files_hosts }))
 }
