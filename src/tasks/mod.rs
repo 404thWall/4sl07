@@ -12,6 +12,7 @@ pub enum MapReduceVersion {
     Default,
     DefaultWithLanguageSplit,
     LanguageCount,
+    LanguageSize,
 }
 
 #[derive(Copy, Clone)]

@@ -227,6 +227,7 @@ pub fn test_all(
             super::map::defaultwithlanguagesplit::map_file
         }
         MapReduceVersion::LanguageCount => super::map::languagecount::map_file,
+        _ => super::map::default::map_file,
     };
 
     print!("Deleting previous files... ");

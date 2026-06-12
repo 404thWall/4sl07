@@ -7,6 +7,7 @@ use std::time::Instant;
 pub mod default;
 pub mod defaultwithlanguagesplit;
 pub mod languagecount;
+pub mod languagesize;
 pub use default::{map_file, map_single_chunk};
 
 /// ## The Map task
@@ -26,6 +27,7 @@ pub fn run_map_task_version(
             defaultwithlanguagesplit::map_file(path, &mut u32_map).unwrap()
         }
         MapReduceVersion::LanguageCount => languagecount::map_file(path, &mut u32_map).unwrap(),
+        MapReduceVersion::LanguageSize => languagesize::map_file(path, &mut u128_map).unwrap(),
     };
     let start = Instant::now();
     match version {
@@ -37,6 +39,9 @@ pub fn run_map_task_version(
         }
         MapReduceVersion::LanguageCount => {
             save_one_map_r_files(&u32_map, r, MAP_DATA_PATH, map_id).unwrap()
+        }
+        MapReduceVersion::LanguageSize => {
+            save_one_map_r_files(&u128_map, r, MAP_DATA_PATH, map_id).unwrap()
         }
     }
     let end = start.elapsed().as_secs_f64();
