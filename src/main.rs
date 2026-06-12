@@ -216,7 +216,7 @@ async fn main() {
         Commands::TestAll {
             number_of_maps,
             number_of_reduces,
-            version
+            version,
         } => {
             if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces), version) {
                 eprintln!("Error: {}", e);

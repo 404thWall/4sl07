@@ -1,9 +1,9 @@
 use rustc_hash::FxHashMap;
-use unicode_script::{Script, UnicodeScript};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, Cursor, Read};
 use std::time::Instant;
+use unicode_script::{Script, UnicodeScript};
 
 const LANGUAGES_TO_SPLIT_BY_CHAR: &[&str] = &["zho", "jpn", "kor"];
 
@@ -77,8 +77,7 @@ pub fn map_file(
         if !skip_first_body {
             let contents: &mut str =
                 str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
-            let true_languages_to_split: Vec<String> =
-            if languages_to_split.len() == 0 {
+            let true_languages_to_split: Vec<String> = if languages_to_split.len() == 0 {
                 vec!["all".to_string()]
             } else {
                 let mut temp = vec![];
@@ -108,7 +107,6 @@ pub fn map_single_chunk(
     if languages_to_split.is_empty() {
         super::default::map_single_chunk(contents, map)
     } else {
-        
         let mut list_of_languages = HashSet::new();
 
         let mut true_languages_to_split = vec![];
@@ -161,7 +159,9 @@ pub fn map_single_chunk(
         let mut split_words = vec![];
         for word in words {
             let mut last_index = 0;
-            for (index, matched_char) in word.match_indices(|c: char| list_of_languages.contains(&c.script())) {
+            for (index, matched_char) in
+                word.match_indices(|c: char| list_of_languages.contains(&c.script()))
+            {
                 // Push the text before the match (if any)
                 if index > last_index {
                     split_words.push(&word[last_index..index]);
@@ -186,4 +186,3 @@ pub fn map_single_chunk(
         Ok(())
     }
 }
-
