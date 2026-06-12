@@ -77,7 +77,7 @@ pub fn map_file(
         if !skip_first_body {
             let contents: &mut str =
                 str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
-            let true_languages_to_split: Vec<String> = if languages_to_split.len() == 0 {
+            let true_languages_to_split: Vec<String> = if languages_to_split.is_empty() {
                 vec!["all".to_string()]
             } else {
                 let mut temp = vec![];

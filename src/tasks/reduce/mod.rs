@@ -18,8 +18,10 @@ pub fn run_reduce_task_version(
         MapReduceVersion::Default => default::reduce_directory(directory_path, &mut map).unwrap(),
         MapReduceVersion::DefaultWithLanguageSplit => {
             defaultwithlanguagesplit::reduce_directory(directory_path, &mut map).unwrap()
-        },
-        MapReduceVersion::LanguageCount => languagecount::reduce_directory(directory_path, &mut map).unwrap(),
+        }
+        MapReduceVersion::LanguageCount => {
+            languagecount::reduce_directory(directory_path, &mut map).unwrap()
+        }
     };
 
     save_one_map_one_file(&map, &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata")).unwrap();
