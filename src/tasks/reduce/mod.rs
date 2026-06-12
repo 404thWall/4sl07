@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 
 pub mod default;
 mod defaultwithlanguagesplit;
+mod languagecount;
 
 /// ## The Reduce task
 /// Combines all the maps present in the files located at each path in the `paths` arg.
@@ -17,7 +18,8 @@ pub fn run_reduce_task_version(
         MapReduceVersion::Default => default::reduce_directory(directory_path, &mut map).unwrap(),
         MapReduceVersion::DefaultWithLanguageSplit => {
             defaultwithlanguagesplit::reduce_directory(directory_path, &mut map).unwrap()
-        }
+        },
+        MapReduceVersion::LanguageCount => languagecount::reduce_directory(directory_path, &mut map).unwrap(),
     };
 
     save_one_map_one_file(&map, &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata")).unwrap();

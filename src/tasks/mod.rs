@@ -11,6 +11,7 @@ pub use testing::{get_test_word_count_from_result, test_all, test_map, test_redu
 pub enum MapReduceVersion {
     Default,
     DefaultWithLanguageSplit,
+    LanguageCount,
 }
 
 #[derive(Copy, Clone)]
@@ -66,4 +67,4 @@ pub const TMP_DIR: &str = CONFIG.tmp_dir;
 pub const FOLDERS_TO_DELETE: &[&str] = CONFIG.folders_to_delete;
 pub const MAP_TASKS_AMOUNT: usize = CONFIG.map_tasks_amount;
 pub const REDUCE_TASKS_AMOUNT: usize = CONFIG.reduce_tasks_amount;
-pub const DEFAULT_VERSION : MapReduceVersion = MapReduceVersion::DefaultWithLanguageSplit;
+pub const DEFAULT_VERSION: MapReduceVersion = MapReduceVersion::DefaultWithLanguageSplit;

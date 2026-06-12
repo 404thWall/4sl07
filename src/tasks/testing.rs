@@ -1,4 +1,6 @@
-use crate::tasks::{MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version};
+use crate::tasks::{
+    MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version,
+};
 
 use super::map::{map_file, map_single_chunk};
 use super::reduce::default::reduce_directory;
@@ -213,17 +215,18 @@ pub fn test_result() -> std::io::Result<()> {
 pub fn test_all(
     number_of_splits: Option<usize>,
     number_of_reduces: Option<usize>,
-    version: MapReduceVersion
+    version: MapReduceVersion,
 ) -> std::io::Result<()> {
     let number_of_splits = number_of_splits.unwrap_or(5);
     let number_of_reduces = number_of_reduces.unwrap_or(REDUCE_TASKS_AMOUNT);
     let mut manual_map: FxHashMap<String, u32> = FxHashMap::default();
 
     let map_file = match version {
-        MapReduceVersion::Default => {
-            super::map::default::map_file
-        },
-        MapReduceVersion::DefaultWithLanguageSplit => super::map::defaultwithlanguagesplit::map_file
+        MapReduceVersion::Default => super::map::default::map_file,
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            super::map::defaultwithlanguagesplit::map_file
+        }
+        MapReduceVersion::LanguageCount => super::map::languagecount::map_file,
     };
 
     print!("Deleting previous files... ");
