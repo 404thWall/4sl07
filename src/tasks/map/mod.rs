@@ -17,17 +17,28 @@ pub fn run_map_task_version(
     map_id: usize,
     version: MapReduceVersion,
 ) -> std::io::Result<Vec<(String, f64)>> {
-    let mut map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
 
     let mut ret = match version {
-        MapReduceVersion::Default => map_file(path, &mut map).unwrap(),
+        MapReduceVersion::Default => map_file(path, &mut u32_map).unwrap(),
         MapReduceVersion::DefaultWithLanguageSplit => {
-            defaultwithlanguagesplit::map_file(path, &mut map).unwrap()
+            defaultwithlanguagesplit::map_file(path, &mut u32_map).unwrap()
         }
-        MapReduceVersion::LanguageCount => languagecount::map_file(path, &mut map).unwrap(),
+        MapReduceVersion::LanguageCount => languagecount::map_file(path, &mut u32_map).unwrap(),
     };
     let start = Instant::now();
-    save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id).unwrap();
+    match version {
+        MapReduceVersion::Default => {
+            save_one_map_r_files(&u32_map, r, MAP_DATA_PATH, map_id).unwrap()
+        }
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            save_one_map_r_files(&u32_map, r, MAP_DATA_PATH, map_id).unwrap()
+        }
+        MapReduceVersion::LanguageCount => {
+            save_one_map_r_files(&u32_map, r, MAP_DATA_PATH, map_id).unwrap()
+        }
+    }
     let end = start.elapsed().as_secs_f64();
     ret.push(("saving".to_string(), end));
     Ok(ret)

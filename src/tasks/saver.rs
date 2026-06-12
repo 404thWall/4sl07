@@ -9,7 +9,10 @@ use std::{
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
 /// This function simply saves the entire map to a single binary file, provided by the `save_path` arg.
-pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> std::io::Result<()> {
+pub fn save_one_map_one_file<T>(map: &FxHashMap<String, T>, save_path: &str) -> std::io::Result<()>
+where
+    T: serde::Serialize,
+{
     let path = Path::new(save_path);
     let save_directory = path.parent().unwrap();
     fs::create_dir_all(save_directory)?;
@@ -28,14 +31,17 @@ pub fn save_one_map_one_file(map: &FxHashMap<String, u32>, save_path: &str) -> s
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
 /// This function saves the entire map to R binary files, corresponding to each reduce tasks.
-pub fn save_one_map_r_files(
-    map: &FxHashMap<String, u32>,
+pub fn save_one_map_r_files<T>(
+    map: &FxHashMap<String, T>,
     r: usize,
     save_directory: &str,
     map_id: usize,
-) -> std::io::Result<()> {
+) -> std::io::Result<()>
+where
+    T: serde::Serialize + Clone + Copy,
+{
     fs::create_dir_all(save_directory)?;
-    let mut maps: Vec<FxHashMap<String, u32>> = vec![FxHashMap::default(); r];
+    let mut maps: Vec<FxHashMap<String, T>> = vec![FxHashMap::default(); r];
 
     for (key, val) in map {
         let mut hasher = DefaultHasher::new();
@@ -53,13 +59,16 @@ pub fn save_one_map_r_files(
 }
 
 /// ### Used to load a map from memory that was saved from one of the save funcions of this module.
-pub fn load_map(file_path: &str) -> std::io::Result<FxHashMap<String, u32>> {
+pub fn load_map<T>(file_path: &str) -> std::io::Result<FxHashMap<String, T>>
+where
+    T: serde::de::DeserializeOwned,
+{
     let read_file = File::open(file_path)?;
     let reader = BufReader::new(read_file);
 
     let loaded_map = serde_json::from_reader(reader);
     if loaded_map.is_err() {
-        panic!("Error loading : {:?}", loaded_map)
+        panic!("Error loading : {:?}", file_path)
     }
 
     Ok(loaded_map.unwrap())

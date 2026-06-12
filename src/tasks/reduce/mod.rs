@@ -12,19 +12,36 @@ pub fn run_reduce_task_version(
     reduce_id: usize,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    let mut map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
 
     match version {
-        MapReduceVersion::Default => default::reduce_directory(directory_path, &mut map).unwrap(),
+        MapReduceVersion::Default => {
+            default::reduce_directory(directory_path, &mut u32_map).unwrap();
+            save_one_map_one_file(
+                &u32_map,
+                &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
+            )
+            .unwrap();
+        }
         MapReduceVersion::DefaultWithLanguageSplit => {
-            defaultwithlanguagesplit::reduce_directory(directory_path, &mut map).unwrap()
+            defaultwithlanguagesplit::reduce_directory(directory_path, &mut u32_map).unwrap();
+            save_one_map_one_file(
+                &u32_map,
+                &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
+            )
+            .unwrap();
         }
         MapReduceVersion::LanguageCount => {
-            languagecount::reduce_directory(directory_path, &mut map).unwrap()
+            languagecount::reduce_directory(directory_path, &mut u32_map).unwrap();
+            save_one_map_one_file(
+                &u32_map,
+                &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
+            )
+            .unwrap();
         }
     };
 
-    save_one_map_one_file(&map, &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata")).unwrap();
     Ok(())
 }
 
