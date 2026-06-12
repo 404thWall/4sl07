@@ -14,13 +14,21 @@ static CONNECTED_FILE_PORT: LazyLock<RwLock<HashMap<String, u16>>> =
 static LAST_RECEIVED_PING: LazyLock<RwLock<HashMap<String, u32>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static TASK_QUEUE: LazyLock<RwLock<Vec<Task>>> = LazyLock::new(|| RwLock::new(Vec::new()));
-static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
-    LazyLock::new(|| RwLock::new((vec![false; MAP_TASKS_AMOUNT], 0)));
+static MAP_TASKS_FINISHED: LazyLock<RwLock<(Vec<String>, u32)>> =
+    LazyLock::new(|| RwLock::new((vec![String::new(); MAP_TASKS_AMOUNT], 0)));
 static REDUCE_TASKS_FINISHED: LazyLock<RwLock<(Vec<bool>, u32)>> =
     LazyLock::new(|| RwLock::new((vec![false; REDUCE_TASKS_AMOUNT], 0)));
 
+// Contains for each reduce task (key), the set of worker addresses that have the relevant map files
+// for this reduce task. Used to send the list of workers to the worker that will execute the reduce task.
 static MAP_RESULT_FILES: LazyLock<RwLock<HashMap<u32, HashSet<String>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+
+// Contains for each client address, the map task currently being executed by the client.
+static MAP_TASKS_IN_PROGRESS: LazyLock<RwLock<HashMap<String, Option<u32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+// Contains the set of worker addresses that have already sent their result files to the main server.
 static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
     LazyLock::new(|| RwLock::new(HashSet::new()));
 
@@ -105,6 +113,7 @@ impl ServerHandler for MainServer {
             Packet::AskForTask => {
                 //  println!("Received AskForTask from {}", addr);
                 let mut queue = TASK_QUEUE.write().await;
+                MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
                 if queue.is_empty() {
                     if RESULT_FILES_SENT.read().await.len()
                         == CONNECTED_FILE_PORT.read().await.len()
@@ -155,6 +164,12 @@ impl ServerHandler for MainServer {
                         .into_iter()
                         .collect()
                 } else {
+                    if let Task::Map(key, _) = task {
+                        MAP_TASKS_IN_PROGRESS
+                            .write()
+                            .await
+                            .insert(addr.to_string(), Some(key));
+                    }
                     vec![]
                 };
                 println!("Assigning task {:?} to {}", task, addr);
@@ -173,8 +188,18 @@ impl ServerHandler for MainServer {
                 match task {
                     Task::Map(key, _) => {
                         let mut tuple = MAP_TASKS_FINISHED.write().await; // (vec, count)
-                        if tuple.0[key as usize] {
-                            println!("Task Map {} was already marked as finished, ignoring", key);
+                        
+                        // Remove the task from the in progress map if the worker has not been reassigned another task since then
+                        println!("Removing Map task {} in progress for worker {}", key, addr);
+                        let mut current_map_tasks_in_progress = MAP_TASKS_IN_PROGRESS.write().await;
+                        if let Some(Some(current_key)) = current_map_tasks_in_progress.get(&addr.to_string()) && *current_key == key {
+                            current_map_tasks_in_progress.insert(addr.to_string(), None);
+                        }
+                        println!("Current tasks in progress: {:?}", current_map_tasks_in_progress);
+                        drop(current_map_tasks_in_progress);
+
+                        if !tuple.0[key as usize].is_empty() {
+                            println!("Task Map {} was already marked as finished by {}, ignoring", key, tuple.0[key as usize]);
                             tx.send(OutMsg::MsgPacket(Packet::TaskValidation {
                                 validated: false,
                                 task,
@@ -183,9 +208,13 @@ impl ServerHandler for MainServer {
                             .ok();
                         } else {
                             println!("Marking Task Map {} as finished", key);
+
+                            // Add the elapsed time for this map task to the average
                             AVERAGE_ELAPSED_MAP_TIME
                                 .fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
-                            tuple.0[key as usize] = true;
+
+                            // Mark the map task as finished globally
+                            tuple.0[key as usize] = addr.to_string();
                             tuple.1 += 1;
                             let count = tuple.1;
                             drop(tuple);
@@ -292,20 +321,58 @@ impl ServerHandler for MainServer {
     }
 
     async fn on_connection_ended(&mut self, _tx: Sender<OutMsg>) -> Result<(), ProtocolError> {
+        println!("Connection with {} ended", self.address.as_ref().unwrap());
+        let addr = self.address.as_ref().unwrap().to_string();
+
+        // Stop the ping task
         if let Some(task) = &self.ping_task {
             task.abort();
         }
+        println!("Ping task for {} stopped", addr);
+        
+        // Mark any map task assigned to this worker as unfinished so that it can be reassigned to another worker
+        let mut finished_map_tasks = MAP_TASKS_FINISHED.write().await;
+        for i in 0..MAP_TASKS_AMOUNT {
+            if finished_map_tasks.0[i] == addr {
+                println!("Worker {} disconnected after having done Map task {}, marking it as unfinished", addr, i);
+                finished_map_tasks.0[i] = String::new();
+                finished_map_tasks.1 -= 1;
+                TASK_QUEUE.write().await.push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
+            }
+        }
+        drop(finished_map_tasks);
+        
+        let in_progress = MAP_TASKS_IN_PROGRESS.read().await.get(&addr).cloned();
+        if let Some(Some(key)) = in_progress {
+            println!("Worker {} disconnected during Map task {}, marking it as unfinished", addr, key);
+            MAP_TASKS_IN_PROGRESS.write().await.insert(addr.to_string(), None);
+            TASK_QUEUE.write().await.push(Task::Map(key, MAP_TASKS_AMOUNT as u32));
+        }
+
+        let mut map_result_files = MAP_RESULT_FILES.write().await;
+        for (reduce_key, set) in map_result_files.iter_mut() {
+            if set.remove(&addr) {
+                println!("Worker {} had result files for Reduce task {}, removing it from the list of workers for this task", addr, reduce_key);
+            }
+        }
+        drop(map_result_files);
+
+        // Remove the worker from the connected workers
         CONNECTED_FILE_PORT
             .write()
             .await
-            .remove(&self.address.as_ref().unwrap().to_string());
+            .remove(&addr);
+
+        // Remove the worker from the result files sent
         RESULT_FILES_SENT
             .write()
             .await
-            .remove(&self.address.as_ref().unwrap().to_string());
+            .remove(&addr);
+
+        // If there are no more connected workers, stop the server
         if CONNECTED_FILE_PORT.read().await.is_empty() {
             println!("================================");
-            println!("All workers disconnecter, stopping server...");
+            println!("All workers disconnected, stopping server...");
             let elapsed_time = MAIN_TIME.elapsed();
             println!("Total elapsed time: {:?}", elapsed_time);
             println!(

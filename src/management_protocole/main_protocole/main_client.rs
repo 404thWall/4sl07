@@ -248,8 +248,16 @@ async fn do_task(
                         eprintln!("Error in Reduce task {}: {}", key, e);
                         return Err(ProtocolError::TaskFailed(format!("Reduce task {} error: {}", key, e)));
                     } else if let Err(e) = res.unwrap() {
-                        eprintln!("Connection Protocole Error in Reduce task {}: {}", key, e);
-                        return Err(ProtocolError::TaskFailed(format!("Reduce task {} connection protocole error: {}", key, e)));
+                        match e {
+                            ProtocolError::ClosingConnection => {
+                                // This error is expected when the file transfer is done, so we can ignore it
+                                println!("File transfer completed for Reduce task {}, closing connection", key);
+                            }
+                            _ => {
+                                eprintln!("Connection Protocole Error in Reduce task {}: {}", key, e);
+                                return Err(ProtocolError::TaskFailed(format!("Reduce task {} connection protocole error: {}", key, e)));
+                            }
+                        }
                     }
                 }
             } else {
