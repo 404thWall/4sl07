@@ -81,6 +81,7 @@ impl ServerHandler for MainServer {
     }
     async fn before_start(&mut self) -> Result<(), ProtocolError> {
         generate_map_tasks().await;
+        generate_reduce_tasks().await;
         Ok(())
     }
     async fn on_connection_established(
@@ -415,7 +416,6 @@ async fn on_map_task_finished(
 
         if count == MAP_TASKS_AMOUNT as u32 {
             println!("All Map tasks finished, generating Reduce tasks...");
-            generate_reduce_tasks().await;
             CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
         }
     }
