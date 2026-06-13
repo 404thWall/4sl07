@@ -255,26 +255,29 @@ impl ServerHandler for MainServer {
                     .write()
                     .await
                     .push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
+                CURRENT_PHASE.store(ProtocolePhase::Map, atomic::Ordering::SeqCst);
+                RESULT_FILES_SENT.write().await.clear();
             }
-            CURRENT_PHASE.store(ProtocolePhase::Map, atomic::Ordering::SeqCst);
-            RESULT_FILES_SENT.write().await.clear();
         }
         drop(finished_map_tasks);
 
         let mut finished_reduce_tasks = REDUCE_TASKS_FINISHED.write().await;
         for i in 0..REDUCE_TASKS_AMOUNT {
-            println!(
-                "Worker {} disconnected after having done Reduce task {}, marking it as unfinished",
-                addr, i
-            );
-            finished_reduce_tasks.0[i] = String::new();
-            finished_reduce_tasks.1 -= 1;
-            REDUCE_TASK_QUEUE
-                .write()
-                .await
-                .push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));
-            if CURRENT_PHASE.load(atomic::Ordering::SeqCst) != ProtocolePhase::Map {
-                CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+            if finished_reduce_tasks.0[i] == addr {
+                println!(
+                    "Worker {} disconnected after having done Reduce task {}, marking it as unfinished",
+                    addr, i
+                );
+                finished_reduce_tasks.0[i] = String::new();
+                finished_reduce_tasks.1 -= 1;
+                REDUCE_TASK_QUEUE
+                    .write()
+                    .await
+                    .push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));
+                // Unfortunately, it isn't atomic...
+                if CURRENT_PHASE.load(atomic::Ordering::SeqCst) != ProtocolePhase::Map {
+                    CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+                }
                 RESULT_FILES_SENT.write().await.clear();
             }
         }
@@ -484,7 +487,7 @@ async fn on_files_saved(addr: SocketAddr, elapsed_time_millis: u128, _tx: Sender
         println!("The current protocole phase has changed, the result was not accepted");
         return;
     }
-    
+
     RESULT_FILES_SENT.write().await.insert(addr.to_string());
     AVERAGE_ELAPSED_SAVE_TIME.fetch_add(elapsed_time_millis as u64, atomic::Ordering::SeqCst);
     println!(
@@ -503,15 +506,22 @@ async fn on_ask_for_task(
     addr: SocketAddr,
     tx: Sender<OutMsg>,
 ) -> Result<Option<Packet>, ProtocolError> {
-    match TASKS_IN_PROGRESS.read().await.get(&addr.to_string()) {
-        None => Ok(Some(Packet::GiveTask {
-            task: Task::None,
-            files_hosts: vec![],
-        })),
+    let mut tasks_in_progress = TASKS_IN_PROGRESS.write().await;
+    match tasks_in_progress.get(&addr.to_string()) {
+        Some(Some(_)) => {
+            println!(
+                "Worker {} is already executing a task, sending None task",
+                addr
+            );
+            Ok(Some(Packet::GiveTask {
+                task: Task::None,
+                files_hosts: vec![],
+            }))
+        }
         _ => {
             let phase = CURRENT_PHASE.load(atomic::Ordering::SeqCst);
             // Get the task queue or return if not needed
-            let mut queue = match phase {
+            let mut queue: tokio::sync::RwLockWriteGuard<'_, Vec<Task>> = match phase {
                 ProtocolePhase::Map => MAP_TASK_QUEUE.write().await,
                 ProtocolePhase::Reduce => REDUCE_TASK_QUEUE.write().await,
                 ProtocolePhase::Finished => {
@@ -541,9 +551,7 @@ async fn on_ask_for_task(
 
             let task = queue.swap_remove(0);
             // Mark task as in progress
-            TASKS_IN_PROGRESS
-                .write()
-                .await
+            tasks_in_progress
                 .insert(addr.to_string(), Some(task.clone()));
             // Get hosts to send
             let files_hosts = if let Task::Reduce(key, _) = task {
