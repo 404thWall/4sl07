@@ -25,6 +25,7 @@ pub enum Packet {
     TaskFinished {
         task: Task,
         elapsed_time_millis: u128, // Time taken to complete the task in milliseconds
+        timing_analysis: Vec<(String, f64)>, // Time taken for each step of the task in milliseconds
         reduce_files: Vec<u32>,    // List of keys for which this task produced a file
     },
     TaskValidation {
@@ -158,12 +159,23 @@ impl Encoder<Packet> for CommandCodec {
             Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files: resulting_files,
             } => {
                 payload.put_u8(0x06); // Message type: TaskFinished
                 encode_task(&task, &mut payload);
                 payload.put_u32(resulting_files.len() as u32);
                 payload.put_u128(elapsed_time_millis);
+                payload.put_u32(timing_analysis.len() as u32);
+                for (step, time) in timing_analysis {
+                    let step_bytes = step.as_bytes();
+                    if step_bytes.len() > 255 {
+                        return Err(ProtocolError::InvalidUtf8);
+                    }
+                    payload.put_u8(step_bytes.len() as u8);
+                    payload.put_slice(step_bytes);
+                    payload.put_f64(time);
+                }
                 for key in resulting_files {
                     payload.put_u32(key);
                 }
@@ -272,7 +284,7 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
         }
         0x06 => {
             let task = decode_task(payload)?;
-            let size =
+            let resulting_files_size =
                 u32::from_be_bytes([payload[9], payload[10], payload[11], payload[12]]) as usize;
             let elapsed_time_millis = u128::from_be_bytes([
                 payload[13],
@@ -292,22 +304,64 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 payload[27],
                 payload[28],
             ]);
-            if payload.len() < 29 + size * 4 {
+            let timing_analysis_size =
+            u32::from_be_bytes([payload[29], payload[30], payload[31], payload[32]]) as usize;
+            let mut timing_analysis = Vec::new();
+            let mut offset = 33;
+
+            for _ in 0..timing_analysis_size {
+                if payload.len() < offset + 1 {
+                    return Err(ProtocolError::UnexpectedPacketFormat(
+                        "Payload too short for timing analysis".to_string(),
+                    ));
+                }
+
+                let step_size = payload[offset] as usize;
+                offset += 1;
+
+                if payload.len() < offset + step_size + 8 {
+                    return Err(ProtocolError::UnexpectedPacketFormat(
+                        "Payload too short for timing analysis".to_string(),
+                    ));
+                }
+
+                let step = std::str::from_utf8(&payload[offset..offset + step_size])
+                    .map_err(|_| ProtocolError::InvalidUtf8)?
+                    .to_string();
+                offset += step_size;
+
+                let time = f64::from_be_bytes([
+                    payload[offset],
+                    payload[offset + 1],
+                    payload[offset + 2],
+                    payload[offset + 3],
+                    payload[offset + 4],
+                    payload[offset + 5],
+                    payload[offset + 6],
+                    payload[offset + 7],
+                ]);
+                offset += 8;
+
+                timing_analysis.push((step, time));
+            }
+
+            if payload.len() < offset + resulting_files_size * 4 {
                 return Err(ProtocolError::InvalidMessageType(msg_type));
             }
             let mut resulting_files = Vec::new();
-            for i in 0..size {
+            for i in 0..resulting_files_size {
                 let key = u32::from_be_bytes([
-                    payload[29 + i * 4],
-                    payload[30 + i * 4],
-                    payload[31 + i * 4],
-                    payload[32 + i * 4],
+                    payload[offset + i * 4],
+                    payload[offset + i * 4 + 1],
+                    payload[offset + i * 4 + 2],
+                    payload[offset + i * 4 + 3],
                 ]);
                 resulting_files.push(key);
             }
             Ok(Some(Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files: resulting_files,
             }))
         }

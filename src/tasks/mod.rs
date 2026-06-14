@@ -23,6 +23,7 @@ struct TasksConfig {
     reduce_initial_data_path: &'static str,
     result_path: &'static str,
     tmp_dir: &'static str,
+    timing_analysis_file_path: &'static str,
     folders_to_delete: &'static [&'static str],
     map_tasks_amount: usize,
     reduce_tasks_amount: usize,
@@ -36,6 +37,7 @@ const CONFIG: TasksConfig = TasksConfig {
     reduce_initial_data_path: "/tmp/4sl07_grp3/to_reduce/",
     result_path: "/tmp/4sl07_grp3/result/",
     tmp_dir: "/tmp/4sl07_grp3/tmp/",
+    timing_analysis_file_path: "/tmp/4sl07_grp3/timing_analysis.json",
     folders_to_delete: &[
         "/tmp/4sl07_grp3/result",
         "/tmp/4sl07_grp3/map_data/",
@@ -54,6 +56,7 @@ const CONFIG: TasksConfig = TasksConfig {
     reduce_initial_data_path: "./to_reduce/",
     result_path: "../result/",
     tmp_dir: "./tmp/",
+    timing_analysis_file_path: "./timing_analysis.json",
     folders_to_delete: &["./map_data/", "./tmp/"],
     map_tasks_amount: 4,
     reduce_tasks_amount: 6,
@@ -65,6 +68,7 @@ pub const MAP_DATA_PATH: &str = CONFIG.map_data_path;
 pub const REDUCE_INITIAL_DATA_PATH: &str = CONFIG.reduce_initial_data_path;
 pub const RESULT_PATH: &str = CONFIG.result_path;
 pub const TMP_DIR: &str = CONFIG.tmp_dir;
+pub const TIMING_ANALYSIS_FILE_PATH: &str = CONFIG.timing_analysis_file_path;
 pub const FOLDERS_TO_DELETE: &[&str] = CONFIG.folders_to_delete;
 pub const MAP_TASKS_AMOUNT: usize = CONFIG.map_tasks_amount;
 pub const REDUCE_TASKS_AMOUNT: usize = CONFIG.reduce_tasks_amount;

@@ -1,11 +1,14 @@
+use std::fs::{self, File};
+use std::io::BufWriter;
 use std::net::SocketAddr;
+use std::path::Path;
 
 use crate::management_protocole::server::{OutMsg, ServerHandler};
 use crate::management_protocole::{Packet, ProtocolError, Task};
 use atomic_enum::atomic_enum;
 use tokio::sync::mpsc::Sender;
 
-use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT};
+use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, TIMING_ANALYSIS_FILE_PATH};
 use std::collections::{HashMap, HashSet};
 use std::sync::{LazyLock, atomic};
 use tokio::sync::RwLock;
@@ -41,13 +44,15 @@ static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
 
 static MAIN_TIME: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
 
+static TIMING_ANALYSIS: LazyLock<RwLock<HashMap<ProtocolePhase, Vec<HashMap<String, f64>>>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
+
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_SAVE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static CURRENT_PHASE: AtomicProtocolePhase = AtomicProtocolePhase::new(ProtocolePhase::Map);
 
 #[atomic_enum]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Hash, serde::Serialize)]
 pub enum ProtocolePhase {
     Map,
     Reduce,
@@ -132,6 +137,7 @@ impl ServerHandler for MainServer {
             Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files,
             } => {
                 println!("Received TaskFinished from {} for task: {:?}", addr, task);
@@ -149,6 +155,7 @@ impl ServerHandler for MainServer {
 
                 match task {
                     Task::Map(key, _) => {
+                        add_timing_analysis(ProtocolePhase::Map, timing_analysis).await;
                         on_map_task_finished(
                             key,
                             addr,
@@ -160,10 +167,14 @@ impl ServerHandler for MainServer {
                         .await
                     }
                     Task::Reduce(key, _) => {
+                        add_timing_analysis(ProtocolePhase::Reduce, timing_analysis).await;
                         on_reduce_task_finished(key, addr, task, elapsed_time_millis, tx.clone())
                             .await
                     }
-                    Task::SaveFiles => on_files_saved(addr, elapsed_time_millis, tx.clone()).await,
+                    Task::SaveFiles => {
+                        add_timing_analysis(ProtocolePhase::SaveFiles, timing_analysis).await;
+                        on_files_saved(addr, elapsed_time_millis, tx.clone()).await
+                    },
                     _ => {}
                 }
                 Ok(None)
@@ -220,6 +231,18 @@ impl ServerHandler for MainServer {
 
             // If there are no more connected workers, stop the server
             if CONNECTED_FILE_PORT.read().await.is_empty() {
+                let path = Path::new(TIMING_ANALYSIS_FILE_PATH);
+                let save_directory = path.parent().unwrap();
+                fs::create_dir_all(save_directory)?;
+
+                let write_file = File::create(path)?;
+                let writer = BufWriter::new(write_file);
+                let timing_analysis = TIMING_ANALYSIS.read().await;
+                let e = serde_json::to_writer_pretty(writer, &*timing_analysis);
+                if e.is_err() {
+                    println!("Error writing : {:?}", e);
+                }
+
                 println!("================================");
                 println!("All workers disconnected, stopping server...");
                 let elapsed_time = MAIN_TIME.elapsed();
@@ -315,6 +338,20 @@ impl ServerHandler for MainServer {
         RESULT_FILES_SENT.write().await.remove(&addr);
         Ok(())
     }
+}
+
+async fn add_timing_analysis(protocol_phase: ProtocolePhase, timing_analysis: Vec<(String, f64)>) {
+    let mut timing_analysis_map = TIMING_ANALYSIS.write().await;
+    let mut phase_timings = timing_analysis_map
+        .get_mut(&protocol_phase)
+        .cloned()
+        .unwrap_or_default();
+    let mut task_timings = HashMap::new();
+    for (phase, time) in timing_analysis {
+        task_timings.insert(phase, time);
+    }
+    phase_timings.push(task_timings);
+    timing_analysis_map.insert(protocol_phase, phase_timings);
 }
 
 async fn server_ping_task(tx: &mut Sender<OutMsg>, addr: &std::net::SocketAddr) {

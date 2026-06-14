@@ -173,19 +173,19 @@ async fn do_task(
                     begin_time.elapsed()
                 );
                 let timings = crate::tasks::run_map_task(&path, REDUCE_TASKS_AMOUNT, key as usize)?;
-                for (phase, time) in timings {
+                for (phase, time) in timings.iter() {
                     println!(
                         "[Time] Map task {} - Phase {}: {} seconds",
                         key, phase, time
                     );
                 }
                 std::fs::remove_file(path).ok();
-                Ok::<(), std::io::Error>(())
+                Ok::<Vec<(String, f64)>, std::io::Error>(timings)
             })
             .await;
 
-            match map_result {
-                Ok(Ok(())) => {}
+            let timing_analysis = match map_result {
+                Ok(Ok(timings)) => timings,
                 Ok(Err(e)) => {
                     eprintln!("Map task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
@@ -216,6 +216,7 @@ async fn do_task(
             tx.send(Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files,
             })
             .await
@@ -225,11 +226,14 @@ async fn do_task(
         }
         Task::Reduce(key, _nkeys) => {
             let begin_time = std::time::Instant::now();
+            let mut timing_analysis: Vec<(String, f64)> = vec![];
+
             let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
             if temp_data_folder.exists() {
                 std::fs::remove_dir_all(temp_data_folder).ok();
             }
             std::fs::create_dir_all(temp_data_folder).unwrap();
+
             if let Some(clients) = connected_clients {
                 println!("Connected clients: {:?}", clients);
                 let map: HashMap<String, u16> = HashMap::from_iter(
@@ -293,7 +297,9 @@ async fn do_task(
             } else {
                 println!("No connected clients");
             }
+            timing_analysis.push(("file_transfer".to_string(), begin_time.elapsed().as_secs_f64()));
 
+            let reduce_begin = std::time::Instant::now();
             let reduce_result = tokio::task::spawn_blocking(move || {
                 crate::tasks::run_reduce_task(
                     crate::tasks::REDUCE_INITIAL_DATA_PATH,
@@ -328,10 +334,12 @@ async fn do_task(
                     )));
                 }
             }
+            timing_analysis.push(("reduce".to_string(), reduce_begin.elapsed().as_secs_f64()));
             let elapsed_time_millis = begin_time.elapsed().as_millis();
             tx.send(Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files: vec![],
             })
             .await
@@ -357,10 +365,12 @@ async fn do_task(
             .await
             .unwrap();
             let elapsed_time_millis = begin_time.elapsed().as_millis();
+            let timing_analysis = vec![];
             println!("Finished SaveFiles task, asking for next task...");
             tx.send(Packet::TaskFinished {
                 task,
                 elapsed_time_millis,
+                timing_analysis,
                 reduce_files: vec![],
             })
             .await
