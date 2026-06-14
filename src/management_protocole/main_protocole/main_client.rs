@@ -225,6 +225,11 @@ async fn do_task(
         }
         Task::Reduce(key, _nkeys) => {
             let begin_time = std::time::Instant::now();
+            let temp_data_folder = std::path::Path::new(crate::tasks::REDUCE_INITIAL_DATA_PATH);
+            if temp_data_folder.exists() {
+                std::fs::remove_dir_all(temp_data_folder).ok();
+            }
+            std::fs::create_dir_all(temp_data_folder).unwrap();
             if let Some(clients) = connected_clients {
                 println!("Connected clients: {:?}", clients);
                 let map: HashMap<String, u16> = HashMap::from_iter(
