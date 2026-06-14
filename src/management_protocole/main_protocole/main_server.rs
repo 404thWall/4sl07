@@ -420,6 +420,10 @@ async fn on_map_task_finished(
         if count == MAP_TASKS_AMOUNT as u32 {
             println!("All Map tasks finished, generating Reduce tasks...");
             CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+            if REDUCE_TASKS_FINISHED.read().await.1 == REDUCE_TASKS_AMOUNT as u32 {
+                println!("All Reduce tasks already finished, moving to SaveFiles phase...");
+                CURRENT_PHASE.store(ProtocolePhase::SaveFiles, atomic::Ordering::SeqCst);
+            }
         }
     }
 }
