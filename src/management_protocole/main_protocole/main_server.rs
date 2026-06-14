@@ -9,7 +9,7 @@ use atomic_enum::atomic_enum;
 use tokio::sync::mpsc::Sender;
 
 use crate::tasks::{MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, TIMING_ANALYSIS_FILE_PATH};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{LazyLock, atomic};
 use tokio::sync::RwLock;
 
@@ -44,7 +44,8 @@ static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
 
 static MAIN_TIME: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
 
-static TIMING_ANALYSIS: LazyLock<RwLock<HashMap<ProtocolePhase, Vec<HashMap<String, f64>>>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
+// Using a BTreeMap instead of a HashMap to ensure the order of the phases is preserved when serializing to JSON
+static TIMING_ANALYSIS: LazyLock<RwLock<BTreeMap<ProtocolePhase, Vec<BTreeMap<String, f64>>>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
@@ -52,7 +53,7 @@ static AVERAGE_ELAPSED_SAVE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static CURRENT_PHASE: AtomicProtocolePhase = AtomicProtocolePhase::new(ProtocolePhase::Map);
 
 #[atomic_enum]
-#[derive(PartialEq, Eq, Hash, serde::Serialize)]
+#[derive(PartialEq, Eq, Hash, serde::Serialize, PartialOrd, Ord)]
 pub enum ProtocolePhase {
     Map,
     Reduce,
@@ -346,7 +347,7 @@ async fn add_timing_analysis(protocol_phase: ProtocolePhase, timing_analysis: Ve
         .get_mut(&protocol_phase)
         .cloned()
         .unwrap_or_default();
-    let mut task_timings = HashMap::new();
+    let mut task_timings = BTreeMap::new();
     for (phase, time) in timing_analysis {
         task_timings.insert(phase, time);
     }
