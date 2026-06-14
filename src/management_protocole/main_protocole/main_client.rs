@@ -374,6 +374,7 @@ async fn do_task(
 }
 
 async fn prepare_files_for_sending() {
+    std::fs::create_dir_all(crate::tasks::RESULT_PATH).unwrap();
     let paths = std::fs::read_dir(crate::tasks::RESULT_PATH).unwrap();
     for path in paths {
         let path = path.unwrap();
