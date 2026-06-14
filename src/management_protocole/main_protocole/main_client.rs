@@ -158,10 +158,11 @@ async fn do_task(
                 ProtocolError::TaskFailed(format!("Map task {} download error: {:?}", key, e))
             })?;
 
+            let download_time = begin_time.elapsed();
             println!(
                 "File downloaded for Map task {} in {:?}",
                 key,
-                begin_time.elapsed()
+                download_time
             );
 
             // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
@@ -184,7 +185,7 @@ async fn do_task(
             })
             .await;
 
-            let timing_analysis = match map_result {
+            let mut timing_analysis = match map_result {
                 Ok(Ok(timings)) => timings,
                 Ok(Err(e)) => {
                     eprintln!("Map task {} failed: {}", key, e);
@@ -212,6 +213,9 @@ async fn do_task(
             let elapsed_time = begin_time.elapsed();
             println!("Finished Map task {} in {:?}", key, elapsed_time);
             let elapsed_time_millis = elapsed_time.as_millis();
+
+            timing_analysis.push(("download".to_string(), download_time.as_secs_f64()));
+            timing_analysis.push(("total".to_string(), elapsed_time.as_secs_f64()));
 
             tx.send(Packet::TaskFinished {
                 task,
@@ -334,11 +338,14 @@ async fn do_task(
                     )));
                 }
             }
+            let elapsed_time = begin_time.elapsed();
+            
             timing_analysis.push(("reduce".to_string(), reduce_begin.elapsed().as_secs_f64()));
-            let elapsed_time_millis = begin_time.elapsed().as_millis();
+            timing_analysis.push(("total".to_string(), elapsed_time.as_secs_f64()));
+            
             tx.send(Packet::TaskFinished {
                 task,
-                elapsed_time_millis,
+                elapsed_time_millis: elapsed_time.as_millis(),
                 timing_analysis,
                 reduce_files: vec![],
             })
@@ -364,12 +371,12 @@ async fn do_task(
             })
             .await
             .unwrap();
-            let elapsed_time_millis = begin_time.elapsed().as_millis();
-            let timing_analysis = vec![];
+            let elapsed_time = begin_time.elapsed();
+            let timing_analysis = vec![("total".to_string(), elapsed_time.as_secs_f64())];
             println!("Finished SaveFiles task, asking for next task...");
             tx.send(Packet::TaskFinished {
                 task,
-                elapsed_time_millis,
+                elapsed_time_millis: elapsed_time.as_millis(),
                 timing_analysis,
                 reduce_files: vec![],
             })
