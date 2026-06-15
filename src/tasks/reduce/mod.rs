@@ -14,34 +14,35 @@ pub fn run_reduce_task_version(
     directory_path: &str,
     reduce_id: usize,
     version: MapReduceVersion,
-) -> std::io::Result<()> {
+) -> std::io::Result<Vec<(String, f64)>> {
     let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
     let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
-
-    match version {
+    let mut input_size = 0;
+    let output_size = match version {
         MapReduceVersion::Default => {
-            default::reduce_directory(directory_path, &mut u32_map).unwrap();
+            input_size += default::reduce_directory(directory_path, &mut u32_map).unwrap();
             save_one_map_one_file(
                 &u32_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
         MapReduceVersion::DefaultWithLanguageSplit => {
-            defaultwithlanguagesplit::reduce_directory(directory_path, &mut u32_map).unwrap();
+            input_size +=
+                defaultwithlanguagesplit::reduce_directory(directory_path, &mut u32_map).unwrap();
             save_one_map_one_file(
                 &u32_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
         MapReduceVersion::LanguageCount => {
-            languagecount::reduce_directory(directory_path, &mut u32_map).unwrap();
+            input_size += languagecount::reduce_directory(directory_path, &mut u32_map).unwrap();
             save_one_map_one_file(
                 &u32_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
         MapReduceVersion::LanguageSize => {
             languagesize::reduce_directory(directory_path, &mut u128_map).unwrap();
@@ -49,15 +50,15 @@ pub fn run_reduce_task_version(
                 &u128_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
         MapReduceVersion::SitePageCount => {
-            sitepagecount::reduce_directory(directory_path, &mut u32_map).unwrap();
+            input_size += sitepagecount::reduce_directory(directory_path, &mut u32_map).unwrap();
             save_one_map_one_file(
                 &u32_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
         MapReduceVersion::SiteSize => {
             sitesize::reduce_directory(directory_path, &mut u128_map).unwrap();
@@ -65,13 +66,20 @@ pub fn run_reduce_task_version(
                 &u128_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
-            .unwrap();
+            .unwrap()
         }
     };
+    let ret: Vec<(String, f64)> = vec![
+        ("input_size".to_string(), input_size as f64),
+        ("output_size".to_string(), output_size),
+    ];
 
-    Ok(())
+    Ok(ret)
 }
 
-pub fn run_reduce_task(directory_path: &str, reduce_id: usize) -> std::io::Result<()> {
+pub fn run_reduce_task(
+    directory_path: &str,
+    reduce_id: usize,
+) -> std::io::Result<Vec<(String, f64)>> {
     run_reduce_task_version(directory_path, reduce_id, DEFAULT_VERSION)
 }

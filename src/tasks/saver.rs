@@ -9,7 +9,7 @@ use std::{
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
 /// This function simply saves the entire map to a single binary file, provided by the `save_path` arg.
-pub fn save_one_map_one_file<T>(map: &FxHashMap<String, T>, save_path: &str) -> std::io::Result<()>
+pub fn save_one_map_one_file<T>(map: &FxHashMap<String, T>, save_path: &str) -> std::io::Result<f64>
 where
     T: serde::Serialize,
 {
@@ -17,16 +17,18 @@ where
     let save_directory = path.parent().unwrap();
     fs::create_dir_all(save_directory)?;
 
-    let write_file = File::create(save_path)?;
-    let writer = BufWriter::new(write_file);
+    {
+        let write_file = File::create(save_path)?;
+        let writer = BufWriter::new(write_file);
 
-    //Serialize the FxHashMap directly into the file
-    let e = serde_json::to_writer_pretty(writer, &map);
-    if e.is_err() {
-        panic!("Error writing : {:?}", e);
+        if let Err(e) = serde_json::to_writer_pretty(writer, &map) {
+            panic!("Error writing : {:?}", e);
+        }
     }
 
-    Ok(())
+    let file_size = fs::metadata(save_path)?.len();
+
+    Ok(file_size as f64)
 }
 
 /// ### Used to save a map created by a call to one of the run functions of the map module.
@@ -36,7 +38,7 @@ pub fn save_one_map_r_files<T>(
     r: usize,
     save_directory: &str,
     map_id: usize,
-) -> std::io::Result<()>
+) -> std::io::Result<f64>
 where
     T: serde::Serialize + Clone + Copy,
 {
@@ -50,20 +52,23 @@ where
         maps[map_number].insert(key.clone(), *val);
     }
 
+    let mut ret: f64 = 0.;
+
     for (i, map_to_save) in maps.iter().enumerate().take(r) {
         let save_path = format!("{save_directory}data_{i}_map_{map_id}.mapdata");
-        save_one_map_one_file(map_to_save, &save_path).unwrap();
+        ret += save_one_map_one_file(map_to_save, &save_path).unwrap();
     }
 
-    Ok(())
+    Ok(ret)
 }
 
 /// ### Used to load a map from memory that was saved from one of the save funcions of this module.
-pub fn load_map<T>(file_path: &str) -> std::io::Result<FxHashMap<String, T>>
+pub fn load_map<T>(file_path: &str) -> std::io::Result<(FxHashMap<String, T>, u64)>
 where
     T: serde::de::DeserializeOwned,
 {
     let read_file = File::open(file_path)?;
+    let size = read_file.metadata()?.len();
     let reader = BufReader::new(read_file);
 
     let loaded_map = serde_json::from_reader(reader);
@@ -71,5 +76,5 @@ where
         panic!("Error loading : {:?}", file_path)
     }
 
-    Ok(loaded_map.unwrap())
+    Ok((loaded_map.unwrap(), size))
 }

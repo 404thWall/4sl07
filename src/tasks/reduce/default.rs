@@ -7,21 +7,22 @@ use crate::tasks::saver::load_map;
 pub fn reduce_directory(
     directory_path: &str,
     map: &mut FxHashMap<String, u32>,
-) -> std::io::Result<()> {
+) -> std::io::Result<u64> {
+    let mut ret: u64 = 0;
     let dir_path = Path::new(directory_path);
     if dir_path.is_dir() {
         for path in fs::read_dir(dir_path)? {
             let path: fs::DirEntry = path?;
             if let Some(file_path) = path.file_name().to_str() {
-                add_file_to_map(&format!("{directory_path}{file_path}"), map);
+                ret += add_file_to_map(&format!("{directory_path}{file_path}"), map)?;
             }
         }
     }
-    Ok(())
+    Ok(ret)
 }
 
-fn add_file_to_map(path: &str, map: &mut FxHashMap<String, u32>) {
-    let temp_map = load_map(path).unwrap();
+fn add_file_to_map(path: &str, map: &mut FxHashMap<String, u32>) -> std::io::Result<u64> {
+    let (temp_map, size) = load_map(path).unwrap();
     for (key, val) in temp_map {
         if let Some(count) = map.get_mut(&key) {
             *count += val;
@@ -29,4 +30,5 @@ fn add_file_to_map(path: &str, map: &mut FxHashMap<String, u32>) {
             map.insert(key, val);
         }
     }
+    Ok(size)
 }

@@ -34,7 +34,7 @@ pub fn run_map_task_version(
         MapReduceVersion::SiteSize => sitesize::map_file(path, &mut u128_map).unwrap(),
     };
     let start = Instant::now();
-    match version {
+    let size = match version {
         MapReduceVersion::Default => {
             save_one_map_r_files(&u32_map, r, MAP_DATA_PATH, map_id).unwrap()
         }
@@ -53,9 +53,10 @@ pub fn run_map_task_version(
         MapReduceVersion::SiteSize => {
             save_one_map_r_files(&u128_map, r, MAP_DATA_PATH, map_id).unwrap()
         }
-    }
+    };
     let end = start.elapsed().as_secs_f64();
     ret.push(("saving".to_string(), end));
+    ret.push(("output_size".to_string(), size));
     Ok(ret)
 }
 

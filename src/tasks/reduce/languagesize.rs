@@ -21,7 +21,7 @@ pub fn reduce_directory(
 }
 
 fn add_file_to_map(path: &str, map: &mut FxHashMap<String, u128>) {
-    let temp_map = load_map(path).unwrap();
+    let (temp_map, _) = load_map(path).unwrap();
     for (key, val) in temp_map {
         if let Some(count) = map.get_mut(&key) {
             *count += val;
