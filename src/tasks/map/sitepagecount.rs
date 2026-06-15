@@ -45,21 +45,14 @@ pub fn map_file(
                 if key == "warc-target-uri" {
                     let url = value.trim();
                     let temp = match url.split_once("//") {
-                        Some((_, rest)) => {
-                            rest.split("/").next().unwrap()
-                        }
-                        None => {
-                            url.split("/").next().unwrap()
-                        }
+                        Some((_, rest)) => rest.split("/").next().unwrap(),
+                        None => url.split("/").next().unwrap(),
                     };
                     site = match temp.split_once("www.") {
-                        Some((_, rest)) => {
-                            rest
-                        }
-                        None => {
-                            temp
-                        }
-                    }.to_string();
+                        Some((_, rest)) => rest,
+                        None => temp,
+                    }
+                    .to_string();
                 }
                 if key == "content-length" {
                     content_length = value.trim().parse::<usize>().unwrap();
@@ -86,13 +79,11 @@ pub fn map_file(
             //let contents: &mut str =
             //    str::from_utf8_mut(&mut chunk_bytes[2..content_length + 2]).unwrap();
 
-
             if let Some(count) = map.get_mut(&site) {
                 *count += 1;
             } else {
                 map.insert(site.to_string(), 1);
             }
-
         } else {
             skip_first_body = false;
         }
