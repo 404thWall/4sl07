@@ -213,8 +213,8 @@ async fn do_task(
             println!("Finished Map task {} in {:?}", key, elapsed_time);
             let elapsed_time_millis = elapsed_time.as_millis();
 
-            timing_analysis.push(("download".to_string(), download_time.as_secs_f64()));
-            timing_analysis.push(("total".to_string(), elapsed_time.as_secs_f64()));
+            timing_analysis.push(("download_time".to_string(), download_time.as_secs_f64()));
+            timing_analysis.push(("total_time".to_string(), elapsed_time.as_secs_f64()));
 
             tx.send(Packet::TaskFinished {
                 task,
@@ -342,8 +342,8 @@ async fn do_task(
             }
             let elapsed_time = begin_time.elapsed();
 
-            timing_analysis.push(("reduce".to_string(), reduce_begin.elapsed().as_secs_f64()));
-            timing_analysis.push(("total".to_string(), elapsed_time.as_secs_f64()));
+            timing_analysis.push(("reduce_time".to_string(), reduce_begin.elapsed().as_secs_f64()));
+            timing_analysis.push(("total_time".to_string(), elapsed_time.as_secs_f64()));
 
             tx.send(Packet::TaskFinished {
                 task,
@@ -374,7 +374,7 @@ async fn do_task(
             .await
             .unwrap();
             let elapsed_time = begin_time.elapsed();
-            let timing_analysis = vec![("total".to_string(), elapsed_time.as_secs_f64())];
+            let timing_analysis = vec![("total_time".to_string(), elapsed_time.as_secs_f64())];
             println!("Finished SaveFiles task, asking for next task...");
             tx.send(Packet::TaskFinished {
                 task,

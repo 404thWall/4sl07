@@ -353,6 +353,7 @@ async fn add_timing_analysis(protocol_phase: ProtocolePhase, timing_analysis: Ve
     for (phase, time) in timing_analysis {
         task_timings.insert(phase, time);
     }
+    task_timings.insert("global_time".to_string(), MAIN_TIME.elapsed().as_secs_f64());
     phase_timings.push(task_timings);
     timing_analysis_map.insert(protocol_phase, phase_timings);
 }
