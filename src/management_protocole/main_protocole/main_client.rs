@@ -307,7 +307,7 @@ async fn do_task(
 
             let reduce_begin = std::time::Instant::now();
             let reduce_result = tokio::task::spawn_blocking(move || {
-                crate::tasks::run_reduce_task(
+                let stats = crate::tasks::run_reduce_task(
                     crate::tasks::REDUCE_INITIAL_DATA_PATH,
                     key as usize,
                 )?;
@@ -317,12 +317,12 @@ async fn do_task(
                 if temp_data_folder.exists() {
                     std::fs::remove_dir_all(temp_data_folder).ok();
                 }
-                Ok::<(), std::io::Error>(())
+                Ok::<Vec<(String, f64)>, std::io::Error>(stats)
             })
             .await;
 
-            match reduce_result {
-                Ok(Ok(())) => {}
+            let timings = match reduce_result {
+                Ok(Ok(stats)) => stats,
                 Ok(Err(e)) => {
                     eprintln!("Reduce task {} failed: {}", key, e);
                     tx.send(Packet::AskForTask).await.ok();
@@ -339,11 +339,14 @@ async fn do_task(
                         key, e
                     )));
                 }
-            }
+            };
             let elapsed_time = begin_time.elapsed();
 
             timing_analysis.push(("reduce_time".to_string(), reduce_begin.elapsed().as_secs_f64()));
             timing_analysis.push(("total_time".to_string(), elapsed_time.as_secs_f64()));
+            for t in timings {
+                timing_analysis.push(t);
+            }
 
             tx.send(Packet::TaskFinished {
                 task,
