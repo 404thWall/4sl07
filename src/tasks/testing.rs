@@ -227,7 +227,7 @@ pub fn test_all(
             super::map::defaultwithlanguagesplit::map_file
         }
         MapReduceVersion::LanguageCount => super::map::languagecount::map_file,
-        _ => super::map::default::map_file,
+        _ => panic!("Version not supportted yet."),
     };
 
     print!("Deleting previous files... ");
