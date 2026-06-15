@@ -55,7 +55,7 @@ pub fn run_map_task_version(
         }
     };
     let end = start.elapsed().as_secs_f64();
-    ret.push(("saving".to_string(), end));
+    ret.push(("saving_time".to_string(), end));
     ret.push(("output_size".to_string(), size));
     Ok(ret)
 }

@@ -342,7 +342,10 @@ async fn do_task(
             };
             let elapsed_time = begin_time.elapsed();
 
-            timing_analysis.push(("reduce_time".to_string(), reduce_begin.elapsed().as_secs_f64()));
+            timing_analysis.push((
+                "reduce_time".to_string(),
+                reduce_begin.elapsed().as_secs_f64(),
+            ));
             timing_analysis.push(("total_time".to_string(), elapsed_time.as_secs_f64()));
             for t in timings {
                 timing_analysis.push(t);
