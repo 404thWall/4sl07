@@ -45,7 +45,9 @@ static RESULT_FILES_SENT: LazyLock<RwLock<HashSet<String>>> =
 static MAIN_TIME: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
 
 // Using a BTreeMap instead of a HashMap to ensure the order of the phases is preserved when serializing to JSON
-static TIMING_ANALYSIS: LazyLock<RwLock<BTreeMap<ProtocolePhase, Vec<BTreeMap<String, f64>>>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
+#[allow(clippy::type_complexity)]
+static TIMING_ANALYSIS: LazyLock<RwLock<BTreeMap<ProtocolePhase, Vec<BTreeMap<String, f64>>>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
 static AVERAGE_ELAPSED_MAP_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 static AVERAGE_ELAPSED_REDUCE_TIME: atomic::AtomicU64 = atomic::AtomicU64::new(0);
@@ -175,7 +177,7 @@ impl ServerHandler for MainServer {
                     Task::SaveFiles => {
                         add_timing_analysis(ProtocolePhase::SaveFiles, timing_analysis).await;
                         on_files_saved(addr, elapsed_time_millis, tx.clone()).await
-                    },
+                    }
                     _ => {}
                 }
                 Ok(None)
@@ -593,8 +595,7 @@ async fn on_ask_for_task(
 
             let task = queue.swap_remove(0);
             // Mark task as in progress
-            tasks_in_progress
-                .insert(addr.to_string(), Some(task.clone()));
+            tasks_in_progress.insert(addr.to_string(), Some(task.clone()));
             // Get hosts to send
             let files_hosts = if let Task::Reduce(key, _) = task {
                 let list = CONNECTED_FILE_PORT.read().await.clone();

@@ -305,7 +305,7 @@ fn parse_packet(data: &[u8]) -> Result<Option<Packet>, ProtocolError> {
                 payload[28],
             ]);
             let timing_analysis_size =
-            u32::from_be_bytes([payload[29], payload[30], payload[31], payload[32]]) as usize;
+                u32::from_be_bytes([payload[29], payload[30], payload[31], payload[32]]) as usize;
             let mut timing_analysis = Vec::new();
             let mut offset = 33;
 

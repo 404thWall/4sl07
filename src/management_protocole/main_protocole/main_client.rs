@@ -161,8 +161,7 @@ async fn do_task(
             let download_time = begin_time.elapsed();
             println!(
                 "File downloaded for Map task {} in {:?}",
-                key,
-                download_time
+                key, download_time
             );
 
             // Keep CPU-heavy and blocking filesystem work off Tokio runtime workers.
@@ -301,7 +300,10 @@ async fn do_task(
             } else {
                 println!("No connected clients");
             }
-            timing_analysis.push(("file_transfer".to_string(), begin_time.elapsed().as_secs_f64()));
+            timing_analysis.push((
+                "file_transfer".to_string(),
+                begin_time.elapsed().as_secs_f64(),
+            ));
 
             let reduce_begin = std::time::Instant::now();
             let reduce_result = tokio::task::spawn_blocking(move || {
@@ -339,10 +341,10 @@ async fn do_task(
                 }
             }
             let elapsed_time = begin_time.elapsed();
-            
+
             timing_analysis.push(("reduce".to_string(), reduce_begin.elapsed().as_secs_f64()));
             timing_analysis.push(("total".to_string(), elapsed_time.as_secs_f64()));
-            
+
             tx.send(Packet::TaskFinished {
                 task,
                 elapsed_time_millis: elapsed_time.as_millis(),
