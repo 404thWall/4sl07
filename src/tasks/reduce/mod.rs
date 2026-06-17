@@ -7,6 +7,7 @@ mod languagecount;
 mod languagesize;
 mod sitepagecount;
 mod sitesize;
+mod reverseweblink;
 
 /// ## The Reduce task
 /// Combines all the maps present in the files located at each path in the `paths` arg.
@@ -17,6 +18,8 @@ pub fn run_reduce_task_version(
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
     let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
+    let mut wtf_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
+
     let mut input_size = 0;
     let output_size = match version {
         MapReduceVersion::Default => {
@@ -64,6 +67,14 @@ pub fn run_reduce_task_version(
             sitesize::reduce_directory(directory_path, &mut u128_map).unwrap();
             save_one_map_one_file(
                 &u128_map,
+                &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
+            )
+            .unwrap()
+        }
+        MapReduceVersion::ReverseWebLink => {
+            reverseweblink::reduce_directory(directory_path, &mut wtf_map).unwrap();
+            save_one_map_one_file(
+                &wtf_map,
                 &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata"),
             )
             .unwrap()

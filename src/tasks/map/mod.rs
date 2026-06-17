@@ -10,6 +10,7 @@ pub mod languagecount;
 pub mod languagesize;
 pub mod sitepagecount;
 pub mod sitesize;
+pub mod reverseweblink;
 pub use default::{map_file, map_single_chunk};
 
 /// ## The Map task
@@ -22,6 +23,7 @@ pub fn run_map_task_version(
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
     let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
+    let mut wtf_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
 
     let mut ret = match version {
         MapReduceVersion::Default => map_file(path, &mut u32_map).unwrap(),
@@ -32,6 +34,7 @@ pub fn run_map_task_version(
         MapReduceVersion::LanguageSize => languagesize::map_file(path, &mut u128_map).unwrap(),
         MapReduceVersion::SitePageCount => sitepagecount::map_file(path, &mut u32_map).unwrap(),
         MapReduceVersion::SiteSize => sitesize::map_file(path, &mut u128_map).unwrap(),
+        MapReduceVersion::ReverseWebLink => reverseweblink::map_file(path, &mut wtf_map).unwrap(),
     };
     let start = Instant::now();
     let size = match version {
@@ -52,6 +55,9 @@ pub fn run_map_task_version(
         }
         MapReduceVersion::SiteSize => {
             save_one_map_r_files(&u128_map, r, MAP_DATA_PATH, map_id).unwrap()
+        }
+        MapReduceVersion::ReverseWebLink => {
+            save_one_map_r_files(&wtf_map, r, MAP_DATA_PATH, map_id).unwrap()
         }
     };
     let end = start.elapsed().as_secs_f64();

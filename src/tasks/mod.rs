@@ -15,6 +15,7 @@ pub enum MapReduceVersion {
     LanguageSize,
     SitePageCount,
     SiteSize,
+    ReverseWebLink,
 }
 
 #[derive(Copy, Clone)]
