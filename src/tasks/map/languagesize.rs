@@ -10,9 +10,10 @@ pub fn map_file(
     let mut ret: Vec<(String, f64)> = vec![];
     let start = Instant::now();
     let file_bytes = fs::read(path)?;
+    let size = file_bytes.len();
     let mut reader = Cursor::new(file_bytes);
     let end = start.elapsed().as_secs_f64();
-    ret.push(("reader".to_string(), end));
+    ret.push(("reading_time".to_string(), end));
 
     let start = Instant::now();
     let mut skip_first_body: bool = true;
@@ -99,6 +100,7 @@ pub fn map_file(
         }
     }
     let end = start.elapsed().as_secs_f64();
-    ret.push(("mapping".to_string(), end));
+    ret.push(("mapping_time".to_string(), end));
+    ret.push(("input_size".to_string(), size as f64));
     Ok(ret)
 }

@@ -13,7 +13,7 @@ pub fn map_file(
     let size = file_bytes.len();
     let mut reader = Cursor::new(file_bytes);
     let end = start.elapsed().as_secs_f64();
-    ret.push(("reader".to_string(), end));
+    ret.push(("reading_time".to_string(), end));
 
     let start = Instant::now();
     let mut skip_first_body: bool = true;
