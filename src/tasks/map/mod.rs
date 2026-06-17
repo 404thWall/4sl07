@@ -1,7 +1,7 @@
 use super::MapReduceVersion;
 use super::saver::save_one_map_r_files;
 use crate::tasks::{DEFAULT_VERSION, MAP_DATA_PATH};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::time::Instant;
 
 pub mod default;
@@ -23,7 +23,7 @@ pub fn run_map_task_version(
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
     let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
-    let mut wtf_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    let mut wtf_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
 
     let mut ret = match version {
         MapReduceVersion::Default => map_file(path, &mut u32_map).unwrap(),
