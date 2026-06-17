@@ -40,7 +40,7 @@ pub fn save_one_map_r_files<T>(
     map_id: usize,
 ) -> std::io::Result<f64>
 where
-    T: serde::Serialize + Clone + Copy,
+    T: serde::Serialize + Clone,
 {
     fs::create_dir_all(save_directory)?;
     let mut maps: Vec<FxHashMap<String, T>> = vec![FxHashMap::default(); r];
@@ -49,7 +49,7 @@ where
         let mut hasher = DefaultHasher::new();
         key.hash(&mut hasher);
         let map_number: usize = (hasher.finish() as usize) % r;
-        maps[map_number].insert(key.clone(), *val);
+        maps[map_number].insert(key.clone(), val.clone());
     }
 
     let mut ret: f64 = 0.;
