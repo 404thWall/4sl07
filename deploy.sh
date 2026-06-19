@@ -1,6 +1,5 @@
 #!/bin/bash
 
-cargo build --release --features prod
 CLIENTS=3
 
 if [ $# -ne 2 ]; then
@@ -10,6 +9,14 @@ fi
 
 CLIENTS=$1
 USER=$2
+
+if [ "$CLIENTS" = "kill" ]; then
+    echo "Killing all clients and server..."
+    python3 scripts/deploy.py --user $USER --count 1 --kill ./target/release/slr07
+    exit 0
+fi
+
+cargo build --release --features prod
 
 echo "Deploying server and $CLIENTS clients..."
 
