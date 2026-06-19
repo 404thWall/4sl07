@@ -7,6 +7,9 @@ pub use map::{run_map_task, run_map_task_version};
 pub use reduce::{run_reduce_task, run_reduce_task_version};
 pub use testing::{get_test_word_count_from_result, test_all, test_map, test_reduce, test_result};
 
+#[cfg(not(feature = "prod"))]
+use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum MapReduceVersion {
     Default,
@@ -30,6 +33,7 @@ struct TasksConfig {
     folders_to_delete: &'static [&'static str],
     map_tasks_amount: usize,
     reduce_tasks_amount: usize,
+    default_version: MapReduceVersion
 }
 
 #[cfg(feature = "prod")]
@@ -49,6 +53,7 @@ const CONFIG: TasksConfig = TasksConfig {
     ],
     map_tasks_amount: 1000,
     reduce_tasks_amount: 40,
+    default_version: DefaultWithLanguageSplit
 };
 
 #[cfg(not(feature = "prod"))]
@@ -63,6 +68,7 @@ const CONFIG: TasksConfig = TasksConfig {
     folders_to_delete: &["./map_data/", "./tmp/"],
     map_tasks_amount: 4,
     reduce_tasks_amount: 6,
+    default_version: DefaultWithLanguageSplit,
 };
 
 pub const WET_PATHS_URL: &str = CONFIG.wet_paths_url;
@@ -75,4 +81,4 @@ pub const TIMING_ANALYSIS_FILE_PATH: &str = CONFIG.timing_analysis_file_path;
 pub const FOLDERS_TO_DELETE: &[&str] = CONFIG.folders_to_delete;
 pub const MAP_TASKS_AMOUNT: usize = CONFIG.map_tasks_amount;
 pub const REDUCE_TASKS_AMOUNT: usize = CONFIG.reduce_tasks_amount;
-pub const DEFAULT_VERSION: MapReduceVersion = MapReduceVersion::DefaultWithLanguageSplit;
+pub const DEFAULT_VERSION: MapReduceVersion = CONFIG.default_version;
