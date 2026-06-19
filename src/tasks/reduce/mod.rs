@@ -1,13 +1,13 @@
 use crate::tasks::{DEFAULT_VERSION, MapReduceVersion, RESULT_PATH, saver::save_one_map_one_file};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub mod default;
-mod defaultwithlanguagesplit;
-mod languagecount;
-mod languagesize;
-mod sitepagecount;
-mod sitesize;
-mod reverseweblink;
+pub mod defaultwithlanguagesplit;
+pub mod languagecount;
+pub mod languagesize;
+pub mod sitepagecount;
+pub mod sitesize;
+pub mod reverseweblink;
 
 /// ## The Reduce task
 /// Combines all the maps present in the files located at each path in the `paths` arg.
@@ -18,7 +18,7 @@ pub fn run_reduce_task_version(
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut u32_map: FxHashMap<String, u32> = FxHashMap::default();
     let mut u128_map: FxHashMap<String, u128> = FxHashMap::default();
-    let mut wtf_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    let mut wtf_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
 
     let mut input_size = 0;
     let output_size = match version {

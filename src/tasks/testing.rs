@@ -1,5 +1,5 @@
 use crate::tasks::{
-    MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version,
+    MAP_DATA_PATH, MapReduceVersion, map, reduce, run_map_task_version, run_reduce_task_version
 };
 
 use super::map::{map_file, map_single_chunk};
@@ -7,7 +7,7 @@ use super::reduce::default::reduce_directory;
 use super::saver::{save_one_map_one_file, save_one_map_r_files};
 use super::{INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, RESULT_PATH};
 use rand::seq::SliceRandom;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -219,16 +219,10 @@ pub fn test_all(
 ) -> std::io::Result<()> {
     let number_of_splits = number_of_splits.unwrap_or(5);
     let number_of_reduces = number_of_reduces.unwrap_or(REDUCE_TASKS_AMOUNT);
-    let mut manual_map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut manual_u32_map: FxHashMap<String, u32> = FxHashMap::default();
+    let mut manual_u128_map: FxHashMap<String, u128> = FxHashMap::default();
+    let mut manual_wtf_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
 
-    let map_file = match version {
-        MapReduceVersion::Default => super::map::default::map_file,
-        MapReduceVersion::DefaultWithLanguageSplit => {
-            super::map::defaultwithlanguagesplit::map_file
-        }
-        MapReduceVersion::LanguageCount => super::map::languagecount::map_file,
-        _ => panic!("Version not supportted yet."),
-    };
 
     print!("Deleting previous files... ");
     io::stdout().flush().unwrap();
@@ -277,7 +271,30 @@ pub fn test_all(
             let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
             print!("Starting map task {i} : {name}... ");
             io::stdout().flush().unwrap();
-            map_file(&name, &mut manual_map).unwrap();
+
+            match version {
+                MapReduceVersion::Default => {
+                    map::default::map_file(&name, &mut manual_u32_map).unwrap();
+                }
+                MapReduceVersion::DefaultWithLanguageSplit => {
+                    map::defaultwithlanguagesplit::map_file(&name, &mut manual_u32_map).unwrap();
+                }
+                MapReduceVersion::LanguageCount => {
+                    map::languagecount::map_file(&name, &mut manual_u32_map).unwrap();
+                }
+                MapReduceVersion::LanguageSize => {
+                    map::languagesize::map_file(&name, &mut manual_u128_map).unwrap();
+                } 
+                MapReduceVersion::SitePageCount => {
+                    map::sitepagecount::map_file(&name, &mut manual_u32_map).unwrap();
+                }
+                MapReduceVersion::SiteSize => {
+                    map::sitesize::map_file(&name, &mut manual_u128_map).unwrap();
+                }
+                MapReduceVersion::ReverseWebLink => {
+                    map::reverseweblink::map_file(&name, &mut manual_wtf_map).unwrap();
+                }
+            }
             print!("50%... ");
             io::stdout().flush().unwrap();
             run_map_task_version(&name, number_of_reduces, i, version).unwrap();
@@ -313,39 +330,31 @@ pub fn test_all(
     }
     println!("Finished reduce tasks.");
 
-    print!("Reforming the map from the results... ");
+    print!("Reforming the map from the results and starting comparison... ");
     io::stdout().flush().unwrap();
-    let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
-    reduce_directory(RESULT_PATH, &mut result_map).unwrap();
-    println!("Done.");
 
-    print!("Starting comparison of result map and manual map... ");
-    io::stdout().flush().unwrap();
-    for (key, value) in manual_map.clone() {
-        assert!(
-            result_map.contains_key(&key),
-            "Result map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            *result_map.get(&key).unwrap(),
-            "Result map had the wrong number of '{key}' : {} instead of {value}",
-            *result_map.get(&key).unwrap()
-        );
-    }
-    print!("50%... ");
-    io::stdout().flush().unwrap();
-    for (key, value) in result_map {
-        assert!(
-            manual_map.contains_key(&key),
-            "Manual map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            *manual_map.get(&key).unwrap(),
-            "Manual map had the wrong number of '{key}' : {} instead of {value}",
-            *manual_map.get(&key).unwrap()
-        );
+    match version {
+        MapReduceVersion::Default
+        | MapReduceVersion::DefaultWithLanguageSplit
+        | MapReduceVersion::LanguageCount
+        | MapReduceVersion::SitePageCount => {
+            let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
+            reduce::default::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
+
+            assert_maps_match(&manual_u32_map, &result_map);
+        }
+        MapReduceVersion::LanguageSize | MapReduceVersion::SiteSize => {
+            let mut result_map: FxHashMap<String, u128> = FxHashMap::default();
+            reduce::languagesize::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
+
+            assert_maps_match(&manual_u128_map, &result_map);
+        }
+        MapReduceVersion::ReverseWebLink => {
+            let mut result_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
+            reduce::reverseweblink::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
+
+            assert_maps_match(&manual_wtf_map, &result_map);
+        }
     }
     println!("Done.");
 
@@ -355,4 +364,34 @@ pub fn test_all(
     println!("===============================================");
 
     Ok(())
+}
+
+fn assert_maps_match<V>(manual_map: &FxHashMap<String, V>, result_map: &FxHashMap<String, V>)
+where
+    V: std::fmt::Debug + PartialEq,
+{
+    for (key, value) in manual_map {
+        assert!(
+            result_map.contains_key(key),
+            "Result map did not contain key '{key}'"
+        );
+        assert_eq!(
+            value,
+            result_map.get(key).unwrap(),
+            "Result map had the wrong value for '{key}': expected {value:?}, got {:?}",
+            result_map.get(key).unwrap()
+        );
+    }
+    for (key, value) in result_map {
+        assert!(
+            manual_map.contains_key(key),
+            "Manual map did not contain key '{key}'"
+        );
+        assert_eq!(
+            value,
+            manual_map.get(key).unwrap(),
+            "Manual map had the wrong value for '{key}': expected {value:?}, got {:?}",
+            manual_map.get(key).unwrap()
+        );
+    }
 }

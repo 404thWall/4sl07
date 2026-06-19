@@ -1,11 +1,11 @@
 use std::{fs, path::Path};
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use crate::tasks::saver::load_map;
 
 pub fn reduce_directory(
     directory_path: &str,
-    map: &mut FxHashMap<String, Vec<String>>,
+    map: &mut FxHashMap<String, FxHashSet<String>>,
 ) -> std::io::Result<()> {
     let dir_path = Path::new(directory_path);
     if dir_path.is_dir() {
@@ -19,11 +19,14 @@ pub fn reduce_directory(
     Ok(())
 }
 
-fn add_file_to_map(path: &str, map: &mut FxHashMap<String, Vec<String>>) {
-    let (temp_map, _) = load_map::<Vec<String>>(path).unwrap();
-    for (key, mut val) in temp_map {
+fn add_file_to_map(path: &str, map: &mut FxHashMap<String, FxHashSet<String>>) {
+    let (temp_map, _) = load_map::<FxHashSet<String>>(path).unwrap();
+    for (key, val) in temp_map {
         if let Some(vector) = map.get_mut(&key) {
-            vector.append(&mut val);
+            for s in val {
+                vector.insert(s);
+            }
+            
         } else {
             map.insert(key, val);
         }
