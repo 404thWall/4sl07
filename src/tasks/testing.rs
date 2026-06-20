@@ -1,6 +1,7 @@
 use crate::tasks::versions::TaskVersion;
 use crate::tasks::versions::default::DefaultVersion;
 use crate::tasks::versions::defaultwithlanguagesplit::DefaultWithLanguageSplitVersion;
+use crate::tasks::versions::inoutlinks::InOutLinksVersion;
 use crate::tasks::versions::languagecount::LanguageCountVersion;
 use crate::tasks::versions::languagesize::LanguageSizeVersion;
 use crate::tasks::versions::reverseweblink::ReverseWebLinkVersion;
@@ -47,6 +48,9 @@ pub fn test_all(
         }
         MapReduceVersion::ReverseWebLink => {
             test_all_generic::<ReverseWebLinkVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::InOutLinks => {
+            test_all_generic::<InOutLinksVersion>(number_of_splits, number_of_reduces, version)
         }
     }
     Ok(())
@@ -256,6 +260,9 @@ pub fn test_result(
             result_path,
             map_tasks_amount,
         ),
+        MapReduceVersion::InOutLinks => {
+            test_result_generic::<InOutLinksVersion>(initial_data_path, result_path, map_tasks_amount)
+        }
     }
     Ok(())
 }

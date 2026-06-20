@@ -6,11 +6,7 @@ use crate::tasks::{
     DEFAULT_VERSION, MAP_DATA_PATH, MapReduceVersion,
     saver::save_one_map_r_files,
     versions::{
-        TaskVersion, default::DefaultVersion,
-        defaultwithlanguagesplit::DefaultWithLanguageSplitVersion,
-        languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion,
-        reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion,
-        sitesize::SiteSizeVersion,
+        TaskVersion, default::DefaultVersion, defaultwithlanguagesplit::DefaultWithLanguageSplitVersion, inoutlinks::InOutLinksVersion, languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion, reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion, sitesize::SiteSizeVersion
     },
 };
 
@@ -41,6 +37,9 @@ pub fn run_map_task_version(
         MapReduceVersion::SiteSize => run_generic_map_task::<SiteSizeVersion>(path, r, map_id),
         MapReduceVersion::ReverseWebLink => {
             run_generic_map_task::<ReverseWebLinkVersion>(path, r, map_id)
+        }
+        MapReduceVersion::InOutLinks => {
+            run_generic_map_task::<InOutLinksVersion>(path, r, map_id)
         }
     }
 }

@@ -7,12 +7,12 @@ use crate::tasks::versions::TaskVersion;
 
 pub struct ReverseWebLinkVersion {}
 
-static URL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+pub static URL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     let pattern = r#"(?:(?:https?|ftp)://(?:www\.)?|www\.)[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z]{2,}(?::[0-9]{1,5})?(?:[/?#][^\s<>"'{};|\\^\[\]`]*)?|\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|net|org|edu|gov|io|co|app|dev|ai|uk|de|fr|ca|au|jp|it|es|info|biz|me|tv|us|xyz|online|site|tech|blog|shop)\b(?::[0-9]{1,5})?(?:[/?#][^\s<>"'{};|\\^\[\]`]*)?"#;
     Regex::new(pattern).expect("Failed to compile URL regex")
 });
 
-fn extract_domain(url: &str) -> &str {
+pub fn extract_domain(url: &str) -> &str {
     let s = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))

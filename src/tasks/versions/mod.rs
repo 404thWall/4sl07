@@ -11,6 +11,7 @@ use crate::tasks::{MapReduceVersion, saver::load_map};
 
 pub mod default;
 pub mod defaultwithlanguagesplit;
+pub mod inoutlinks;
 pub mod languagecount;
 pub mod languagesize;
 pub mod reverseweblink;
@@ -182,6 +183,7 @@ impl std::fmt::Display for MapReduceVersion {
             MapReduceVersion::ReverseWebLink => "ReverseWebLink",
             MapReduceVersion::SitePageCount => "SitePageCount",
             MapReduceVersion::SiteSize => "SiteSize",
+            MapReduceVersion::InOutLinks => "InOutLinks"
         };
         write!(f, "{text}")
     }
