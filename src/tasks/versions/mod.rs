@@ -5,9 +5,10 @@ use std::{
     time::Instant,
 };
 
+use clap::ValueEnum;
 use rustc_hash::FxHashMap;
 
-use crate::tasks::{MapReduceVersion, saver::load_map};
+use crate::tasks::saver::load_map;
 
 pub mod default;
 pub mod defaultwithlanguagesplit;
@@ -17,6 +18,36 @@ pub mod languagesize;
 pub mod reverseweblink;
 pub mod sitepagecount;
 pub mod sitesize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum MapReduceVersion {
+    Default,
+    DefaultWithLanguageSplit,
+    InOutLinks,
+    LanguageCount,
+    LanguageSize,
+    ReverseWebLink,
+    SitePageCount,
+    SiteSize,
+}
+
+/// Macro to not have to update this big match everywhere each time a new version is added.
+#[macro_export]
+macro_rules! versioned {
+    ($version:expr, $func:ident ($($args:expr),* $(,)?)) => {
+        match $version {
+            MapReduceVersion::Default => $func::<DefaultVersion>($($args),*),
+            MapReduceVersion::DefaultWithLanguageSplit => $func::<DefaultWithLanguageSplitVersion>($($args),*),
+            MapReduceVersion::InOutLinks => $func::<InOutLinksVersion>($($args),*),
+            MapReduceVersion::LanguageCount => $func::<LanguageCountVersion>($($args),*),
+            MapReduceVersion::LanguageSize => $func::<LanguageSizeVersion>($($args),*),
+            MapReduceVersion::ReverseWebLink => $func::<ReverseWebLinkVersion>($($args),*),
+            MapReduceVersion::SitePageCount => $func::<SitePageCountVersion>($($args),*),
+            MapReduceVersion::SiteSize => $func::<SiteSizeVersion>($($args),*),
+            
+        }
+    };
+}
 
 /// The trait to be implemented for new versions of the MapReduce algorithm.
 pub trait TaskVersion {
@@ -175,16 +206,7 @@ pub trait TaskVersion {
 
 impl std::fmt::Display for MapReduceVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            MapReduceVersion::Default => "Default",
-            MapReduceVersion::DefaultWithLanguageSplit => "DefaultWithLanguageSplit",
-            MapReduceVersion::LanguageCount => "LanguageCount",
-            MapReduceVersion::LanguageSize => "LanguageSize",
-            MapReduceVersion::ReverseWebLink => "ReverseWebLink",
-            MapReduceVersion::SitePageCount => "SitePageCount",
-            MapReduceVersion::SiteSize => "SiteSize",
-            MapReduceVersion::InOutLinks => "InOutLinks"
-        };
-        write!(f, "{text}")
+        let text = self.to_possible_value().unwrap();
+        write!(f, "{}", text.get_name())
     }
 }

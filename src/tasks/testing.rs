@@ -10,6 +10,7 @@ use crate::tasks::versions::sitesize::SiteSizeVersion;
 use crate::tasks::{
     MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version,
 };
+use crate::versioned;
 
 use super::{INITIAL_DATA_PATH, RESULT_PATH};
 use rand::seq::SliceRandom;
@@ -23,36 +24,7 @@ pub fn test_all(
     number_of_reduces: Option<usize>,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    match version {
-        MapReduceVersion::Default => {
-            test_all_generic::<DefaultVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::DefaultWithLanguageSplit => {
-            test_all_generic::<DefaultWithLanguageSplitVersion>(
-                number_of_splits,
-                number_of_reduces,
-                version,
-            )
-        }
-        MapReduceVersion::LanguageCount => {
-            test_all_generic::<LanguageCountVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::LanguageSize => {
-            test_all_generic::<LanguageSizeVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::SitePageCount => {
-            test_all_generic::<SitePageCountVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::SiteSize => {
-            test_all_generic::<SiteSizeVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::ReverseWebLink => {
-            test_all_generic::<ReverseWebLinkVersion>(number_of_splits, number_of_reduces, version)
-        }
-        MapReduceVersion::InOutLinks => {
-            test_all_generic::<InOutLinksVersion>(number_of_splits, number_of_reduces, version)
-        }
-    }
+    versioned!(version, test_all_generic(number_of_splits, number_of_reduces, version));
     Ok(())
 }
 
@@ -226,44 +198,7 @@ pub fn test_result(
     map_tasks_amount: usize,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    match version {
-        MapReduceVersion::Default => {
-            test_result_generic::<DefaultVersion>(initial_data_path, result_path, map_tasks_amount)
-        }
-        MapReduceVersion::DefaultWithLanguageSplit => {
-            test_result_generic::<DefaultWithLanguageSplitVersion>(
-                initial_data_path,
-                result_path,
-                map_tasks_amount,
-            )
-        }
-        MapReduceVersion::LanguageCount => test_result_generic::<LanguageCountVersion>(
-            initial_data_path,
-            result_path,
-            map_tasks_amount,
-        ),
-        MapReduceVersion::LanguageSize => test_result_generic::<LanguageSizeVersion>(
-            initial_data_path,
-            result_path,
-            map_tasks_amount,
-        ),
-        MapReduceVersion::SitePageCount => test_result_generic::<SitePageCountVersion>(
-            initial_data_path,
-            result_path,
-            map_tasks_amount,
-        ),
-        MapReduceVersion::SiteSize => {
-            test_result_generic::<SiteSizeVersion>(initial_data_path, result_path, map_tasks_amount)
-        }
-        MapReduceVersion::ReverseWebLink => test_result_generic::<ReverseWebLinkVersion>(
-            initial_data_path,
-            result_path,
-            map_tasks_amount,
-        ),
-        MapReduceVersion::InOutLinks => {
-            test_result_generic::<InOutLinksVersion>(initial_data_path, result_path, map_tasks_amount)
-        }
-    }
+    versioned!(version, test_result_generic(initial_data_path, result_path, map_tasks_amount));
     Ok(())
 }
 

@@ -1,4 +1,3 @@
-use clap::ValueEnum;
 mod map;
 mod reduce;
 mod saver;
@@ -10,17 +9,7 @@ pub use testing::{test_all, test_result};
 
 use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum MapReduceVersion {
-    Default,
-    DefaultWithLanguageSplit,
-    LanguageCount,
-    LanguageSize,
-    SitePageCount,
-    SiteSize,
-    ReverseWebLink,
-    InOutLinks
-}
+pub use versions::MapReduceVersion;
 
 #[derive(Copy, Clone)]
 struct TasksConfig {

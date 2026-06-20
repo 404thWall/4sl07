@@ -2,13 +2,17 @@ use std::time::Instant;
 
 use rustc_hash::FxHashMap;
 
-use crate::tasks::{
+use crate::{tasks::{
     DEFAULT_VERSION, MAP_DATA_PATH, MapReduceVersion,
     saver::save_one_map_r_files,
     versions::{
-        TaskVersion, default::DefaultVersion, defaultwithlanguagesplit::DefaultWithLanguageSplitVersion, inoutlinks::InOutLinksVersion, languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion, reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion, sitesize::SiteSizeVersion
+        TaskVersion, default::DefaultVersion,
+        defaultwithlanguagesplit::DefaultWithLanguageSplitVersion, inoutlinks::InOutLinksVersion,
+        languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion,
+        reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion,
+        sitesize::SiteSizeVersion,
     },
-};
+}, versioned};
 
 pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
     run_map_task_version(path, r, map_id, DEFAULT_VERSION)
@@ -20,28 +24,7 @@ pub fn run_map_task_version(
     map_id: usize,
     version: MapReduceVersion,
 ) -> std::io::Result<Vec<(String, f64)>> {
-    match version {
-        MapReduceVersion::Default => run_generic_map_task::<DefaultVersion>(path, r, map_id),
-        MapReduceVersion::DefaultWithLanguageSplit => {
-            run_generic_map_task::<DefaultWithLanguageSplitVersion>(path, r, map_id)
-        }
-        MapReduceVersion::LanguageCount => {
-            run_generic_map_task::<LanguageCountVersion>(path, r, map_id)
-        }
-        MapReduceVersion::LanguageSize => {
-            run_generic_map_task::<LanguageSizeVersion>(path, r, map_id)
-        }
-        MapReduceVersion::SitePageCount => {
-            run_generic_map_task::<SitePageCountVersion>(path, r, map_id)
-        }
-        MapReduceVersion::SiteSize => run_generic_map_task::<SiteSizeVersion>(path, r, map_id),
-        MapReduceVersion::ReverseWebLink => {
-            run_generic_map_task::<ReverseWebLinkVersion>(path, r, map_id)
-        }
-        MapReduceVersion::InOutLinks => {
-            run_generic_map_task::<InOutLinksVersion>(path, r, map_id)
-        }
-    }
+    versioned!(version, run_generic_map_task(path, r, map_id))
 }
 
 fn run_generic_map_task<T: TaskVersion>(
