@@ -5,8 +5,8 @@ use slr07::management_protocole::file_transfer_protocole::file_client::FileClien
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
-    MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, run_map_task_version,
-    run_reduce_task_version, test_all,
+    INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, RESULT_PATH,
+    run_map_task_version, run_reduce_task_version, test_all, test_result,
 };
 
 #[derive(Parser, Debug)]
@@ -46,6 +46,19 @@ enum Commands {
         path: String,
         /// The id of the reduce task.
         reduce_id: usize,
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
+        version: MapReduceVersion,
+    },
+    TestResult {
+        /// Path to the folder containing the files to map. Must end in a '/'.
+        #[arg(short, long, default_value_t = INITIAL_DATA_PATH.to_owned())]
+        initial_data_path: String,
+        /// Path to the folder containing the results of the reduces to test. Must end in a '/'.
+        #[arg(short, long, default_value_t = RESULT_PATH.to_owned())]
+        result_path: String,
+        /// How many of the files to map were mapped in the result to test.
+        #[arg(short, long, default_value_t = MAP_TASKS_AMOUNT)]
+        map_tasks_amount: usize,
         #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
     },
@@ -162,11 +175,24 @@ async fn main() {
                 }
             }
         }
+        Commands::TestResult {
+            initial_data_path,
+            result_path,
+            map_tasks_amount,
+            version,
+        } => {
+            println!("Testing the results of the {version} version...");
+            if let Err(e) = test_result(&initial_data_path, &result_path, map_tasks_amount, version)
+            {
+                eprintln!("Error: {}", e);
+            }
+        }
         Commands::TestAll {
             map_count,
             reduce_count,
             version,
         } => {
+            println!("Testing the implementation of the {version} version...");
             if let Err(e) = test_all(Some(map_count), Some(reduce_count), version) {
                 eprintln!("Error: {}", e);
             }

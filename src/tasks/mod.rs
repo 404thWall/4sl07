@@ -6,7 +6,7 @@ mod testing;
 pub mod versions;
 pub use map::{run_map_task, run_map_task_version};
 pub use reduce::{run_reduce_task, run_reduce_task_version};
-pub use testing::test_all;
+pub use testing::{test_all, test_result};
 
 use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
 

@@ -208,3 +208,99 @@ fn test_all_generic<T: TaskVersion>(
     }
     println!("Done.");
 }
+
+/// Tests the result of the `version` implementation of MapReduce.
+/// Do note that it is assumed that the result were obtained using
+/// the first `map_tasks_amount` files in alphabetical order located
+/// in the `initial_data_path` folder. Both folders must also end in
+/// a '/'.
+pub fn test_result(
+    initial_data_path: &str,
+    result_path: &str,
+    map_tasks_amount: usize,
+    version: MapReduceVersion,
+) -> std::io::Result<()> {
+    match version {
+        MapReduceVersion::Default => {
+            test_result_generic::<DefaultVersion>(initial_data_path, result_path, map_tasks_amount)
+        }
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            test_result_generic::<DefaultWithLanguageSplitVersion>(
+                initial_data_path,
+                result_path,
+                map_tasks_amount,
+            )
+        }
+        MapReduceVersion::LanguageCount => test_result_generic::<LanguageCountVersion>(
+            initial_data_path,
+            result_path,
+            map_tasks_amount,
+        ),
+        MapReduceVersion::LanguageSize => test_result_generic::<LanguageSizeVersion>(
+            initial_data_path,
+            result_path,
+            map_tasks_amount,
+        ),
+        MapReduceVersion::SitePageCount => test_result_generic::<SitePageCountVersion>(
+            initial_data_path,
+            result_path,
+            map_tasks_amount,
+        ),
+        MapReduceVersion::SiteSize => {
+            test_result_generic::<SiteSizeVersion>(initial_data_path, result_path, map_tasks_amount)
+        }
+        MapReduceVersion::ReverseWebLink => test_result_generic::<ReverseWebLinkVersion>(
+            initial_data_path,
+            result_path,
+            map_tasks_amount,
+        ),
+    }
+    Ok(())
+}
+
+fn test_result_generic<T: TaskVersion>(
+    initial_data_path: &str,
+    result_path: &str,
+    map_tasks_amount: usize,
+) {
+    println!("Starting manual map of the {map_tasks_amount} first files in {initial_data_path}...");
+    let paths = std::fs::read_dir(initial_data_path).unwrap();
+    let mut candidates = vec![];
+    for path in paths {
+        let path = path.unwrap().path();
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("CC-MAIN-")
+        {
+            candidates.push(path);
+        }
+    }
+    candidates.sort();
+
+    let mut map: FxHashMap<String, T::Intermediate> = FxHashMap::default();
+    for (i, file) in candidates.iter().enumerate().take(map_tasks_amount) {
+        if let Some(file_path) = file.file_name() {
+            let name = format!("{}{}", initial_data_path, file_path.to_str().unwrap());
+            println!("Starting {i}th map task : {name}");
+            T::map_file(&name, &mut map);
+        } else {
+            panic!("Failed to start the {i}th map task.")
+        }
+    }
+
+    println!("Finished manual map of the {map_tasks_amount} first files...");
+    println!("Starting manual reduce of the result files in {result_path}...");
+
+    let mut result_map: FxHashMap<String, T::Final> = FxHashMap::default();
+    T::reduce_directory(result_path, &mut result_map);
+    assert_maps_match(&map, &result_map);
+
+    println!();
+    println!("===============================================");
+    println!("          Test finished successfully!          ");
+    println!("===============================================");
+}

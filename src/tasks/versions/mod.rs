@@ -7,7 +7,7 @@ use std::{
 
 use rustc_hash::FxHashMap;
 
-use crate::tasks::saver::load_map;
+use crate::tasks::{MapReduceVersion, saver::load_map};
 
 pub mod default;
 pub mod defaultwithlanguagesplit;
@@ -169,5 +169,20 @@ pub trait TaskVersion {
             }
         }
         ret
+    }
+}
+
+impl std::fmt::Display for MapReduceVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            MapReduceVersion::Default => "Default",
+            MapReduceVersion::DefaultWithLanguageSplit => "DefaultWithLanguageSplit",
+            MapReduceVersion::LanguageCount => "LanguageCount",
+            MapReduceVersion::LanguageSize => "LanguageSize",
+            MapReduceVersion::ReverseWebLink => "ReverseWebLink",
+            MapReduceVersion::SitePageCount => "SitePageCount",
+            MapReduceVersion::SiteSize => "SiteSize",
+        };
+        write!(f, "{text}")
     }
 }
