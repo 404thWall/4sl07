@@ -5,8 +5,8 @@ use slr07::management_protocole::file_transfer_protocole::file_client::FileClien
 use slr07::management_protocole::file_transfer_protocole::file_server::FileServer;
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
-    MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, get_test_word_count_from_result,
-    run_map_task_version, run_reduce_task_version, test_all, test_map, test_reduce, test_result,
+    MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, run_map_task_version,
+    run_reduce_task_version, test_all,
 };
 
 #[derive(Parser, Debug)]
@@ -49,41 +49,17 @@ enum Commands {
         #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
     },
-    TestMap {
-        /// Path to the _file_ to evaluate the map performance on.
-        path: String,
-        #[arg(short, long, default_value_t = 20)]
-        /// Number of times both implementations will be ran. Used to
-        /// reduce randomness at the cost of computing time.
-        number_of_tests: u32,
-    },
-    TestReduce {
-        /// Path to the _file_ to map. After the map is complete,
-        /// the mapped files will be reduced, and the result will
-        /// be tested.
-        path: String,
-    },
-    TestResult,
-    /// Chooses `number_of_maps` random splits from the default directory
-    /// and maps them into `number_of_reduces` files. Theses mapped files
+    /// Chooses `map_count` random splits from the default directory
+    /// and maps them into `reduce_count` files. Theses mapped files
     /// are then reduced, and a test to check the integrity of the result
     /// files is then ran.
     TestAll {
         #[arg(short, long, default_value_t = MAP_TASKS_AMOUNT)]
-        number_of_maps: usize,
+        map_count: usize,
         #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
-        number_of_reduces: usize,
+        reduce_count: usize,
         #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
-    },
-    GetWordCount {
-        /// Path to the result _directory_ from which we want to get the
-        /// word count of the word `word`.
-        path: String,
-        #[arg(short, long, default_value = "the")]
-        /// Word that we want to have the number of in the results.
-        /// Should be in lowercase.
-        word: String,
     },
     TestDownload,
 }
@@ -186,39 +162,12 @@ async fn main() {
                 }
             }
         }
-        Commands::TestMap {
-            path,
-            number_of_tests,
-        } => {
-            println!("Testing the Map Implementation...");
-            if let Err(e) = test_map(&path, number_of_tests) {
-                eprintln!("Error: {}", e);
-            }
-        }
-        Commands::TestReduce { path } => {
-            println!("Testing the Reduce Implementation...");
-            if let Err(e) = test_reduce(&path) {
-                eprintln!("Error: {}", e);
-            }
-        }
-        Commands::GetWordCount { path, word } => {
-            println!("Fetching the test word count from the result...");
-            if let Err(e) = get_test_word_count_from_result(&path, &word) {
-                eprintln!("Error: {}", e);
-            }
-        }
-        Commands::TestResult => {
-            println!("Testing the result from the deployement...");
-            if let Err(e) = test_result() {
-                eprintln!("Error: {}", e);
-            }
-        }
         Commands::TestAll {
-            number_of_maps,
-            number_of_reduces,
+            map_count,
+            reduce_count,
             version,
         } => {
-            if let Err(e) = test_all(Some(number_of_maps), Some(number_of_reduces), version) {
+            if let Err(e) = test_all(Some(map_count), Some(reduce_count), version) {
                 eprintln!("Error: {}", e);
             }
         }

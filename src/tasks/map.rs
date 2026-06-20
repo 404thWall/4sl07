@@ -1,0 +1,64 @@
+use std::time::Instant;
+
+use rustc_hash::FxHashMap;
+
+use crate::tasks::{
+    DEFAULT_VERSION, MAP_DATA_PATH, MapReduceVersion,
+    saver::save_one_map_r_files,
+    versions::{
+        TaskVersion, default::DefaultVersion,
+        defaultwithlanguagesplit::DefaultWithLanguageSplitVersion,
+        languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion,
+        reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion,
+        sitesize::SiteSizeVersion,
+    },
+};
+
+pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
+    run_map_task_version(path, r, map_id, DEFAULT_VERSION)
+}
+
+pub fn run_map_task_version(
+    path: &str,
+    r: usize,
+    map_id: usize,
+    version: MapReduceVersion,
+) -> std::io::Result<Vec<(String, f64)>> {
+    match version {
+        MapReduceVersion::Default => run_generic_map_task::<DefaultVersion>(path, r, map_id),
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            run_generic_map_task::<DefaultWithLanguageSplitVersion>(path, r, map_id)
+        }
+        MapReduceVersion::LanguageCount => {
+            run_generic_map_task::<LanguageCountVersion>(path, r, map_id)
+        }
+        MapReduceVersion::LanguageSize => {
+            run_generic_map_task::<LanguageSizeVersion>(path, r, map_id)
+        }
+        MapReduceVersion::SitePageCount => {
+            run_generic_map_task::<SitePageCountVersion>(path, r, map_id)
+        }
+        MapReduceVersion::SiteSize => run_generic_map_task::<SiteSizeVersion>(path, r, map_id),
+        MapReduceVersion::ReverseWebLink => {
+            run_generic_map_task::<ReverseWebLinkVersion>(path, r, map_id)
+        }
+    }
+}
+
+fn run_generic_map_task<T: TaskVersion>(
+    path: &str,
+    r: usize,
+    map_id: usize,
+) -> std::io::Result<Vec<(String, f64)>> {
+    let mut map: FxHashMap<String, T::Intermediate> = FxHashMap::default();
+    let mut ret = T::map_file(path, &mut map);
+
+    let start = Instant::now();
+    let size = save_one_map_r_files(&map, r, MAP_DATA_PATH, map_id).unwrap();
+    let end = start.elapsed().as_secs_f64();
+
+    ret.push(("saving_time".to_string(), end));
+    ret.push(("output_size".to_string(), size));
+
+    Ok(ret)
+}

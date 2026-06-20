@@ -3,9 +3,10 @@ mod map;
 mod reduce;
 mod saver;
 mod testing;
+pub mod versions;
 pub use map::{run_map_task, run_map_task_version};
 pub use reduce::{run_reduce_task, run_reduce_task_version};
-pub use testing::{get_test_word_count_from_result, test_all, test_map, test_reduce, test_result};
+pub use testing::test_all;
 
 use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
 
@@ -32,7 +33,7 @@ struct TasksConfig {
     folders_to_delete: &'static [&'static str],
     map_tasks_amount: usize,
     reduce_tasks_amount: usize,
-    default_version: MapReduceVersion
+    default_version: MapReduceVersion,
 }
 
 #[cfg(feature = "prod")]
@@ -52,7 +53,7 @@ const CONFIG: TasksConfig = TasksConfig {
     ],
     map_tasks_amount: 1000,
     reduce_tasks_amount: 40,
-    default_version: DefaultWithLanguageSplit
+    default_version: DefaultWithLanguageSplit,
 };
 
 #[cfg(not(feature = "prod"))]

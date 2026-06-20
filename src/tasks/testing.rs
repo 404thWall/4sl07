@@ -1,228 +1,98 @@
+use crate::tasks::versions::TaskVersion;
+use crate::tasks::versions::default::DefaultVersion;
+use crate::tasks::versions::defaultwithlanguagesplit::DefaultWithLanguageSplitVersion;
+use crate::tasks::versions::languagecount::LanguageCountVersion;
+use crate::tasks::versions::languagesize::LanguageSizeVersion;
+use crate::tasks::versions::reverseweblink::ReverseWebLinkVersion;
+use crate::tasks::versions::sitepagecount::SitePageCountVersion;
+use crate::tasks::versions::sitesize::SiteSizeVersion;
 use crate::tasks::{
-    MAP_DATA_PATH, MapReduceVersion, map, reduce, run_map_task_version, run_reduce_task_version
+    MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version,
 };
 
-use super::map::{map_file, map_single_chunk};
-use super::reduce::default::reduce_directory;
-use super::saver::{save_one_map_one_file, save_one_map_r_files};
-use super::{INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, REDUCE_TASKS_AMOUNT, RESULT_PATH};
+use super::{INITIAL_DATA_PATH, RESULT_PATH};
 use rand::seq::SliceRandom;
-use rustc_hash::{FxHashMap, FxHashSet};
-use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use rustc_hash::FxHashMap;
+use std::fs;
+use std::io::{self, Write};
 use std::path::Path;
-use std::time::Instant;
-
-const WORD_TO_TEST: &str = "the";
-
-/// Evaluates the performance of the current Map task implementation.
-/// It is compared to the naive approach of neglecting the headers and just parsing the entire file.
-pub fn test_map(path: &str, number_of_tests: u32) -> std::io::Result<()> {
-    println!("Starting Map WITH headers taken into account...");
-    let start = Instant::now();
-    for _ in 0..number_of_tests {
-        let mut map: FxHashMap<String, u32> = FxHashMap::default();
-        map_file(path, &mut map).unwrap();
-        if let Some(count) = map.get(WORD_TO_TEST) {
-            println!(
-                "As an example, the word '{WORD_TO_TEST}' was present {} times",
-                count
-            );
-        }
-    }
-    let delay_with = start.elapsed().as_secs_f64();
-    println!("Executions finished! They took {:}s to run.\n", delay_with);
-
-    println!("Starting Map WITHOUT headers taken into account...");
-    let start = Instant::now();
-    for _ in 0..number_of_tests {
-        let mut map: FxHashMap<String, u32> = FxHashMap::default();
-        let mut file = File::open(path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        contents.make_ascii_lowercase();
-
-        map_single_chunk(&mut contents, &mut map).unwrap();
-
-        if let Some(count) = map.get(WORD_TO_TEST) {
-            println!(
-                "As an example, the word '{WORD_TO_TEST}' was present {} times",
-                count
-            );
-        }
-    }
-    let delay_without = start.elapsed().as_secs_f64();
-    println!(
-        "Executions finished! They took {:}s to run.\n",
-        delay_without
-    );
-
-    println!(
-        "   WITH headers  : {:}s",
-        delay_with / (number_of_tests as f64)
-    );
-    println!(
-        "WITHOUT headers  : {:}s",
-        delay_without / (number_of_tests as f64)
-    );
-
-    Ok(())
-}
-
-/// Will run the map implementation on the file at `path`, and then attempt to reduce it.
-/// A test to compare the map obtained by the Map task and the one obtained by the Reduce task will also be run.
-pub fn test_reduce(path: &str) -> std::io::Result<()> {
-    let mut map_from_map_task: FxHashMap<String, u32> = FxHashMap::default();
-    map_file(path, &mut map_from_map_task).unwrap();
-    save_one_map_r_files(&map_from_map_task, 100, "./tests/", 0).unwrap();
-
-    let mut map_from_reduce_task: FxHashMap<String, u32> = FxHashMap::default();
-    reduce_directory("./tests/", &mut map_from_reduce_task).unwrap();
-
-    save_one_map_one_file(&map_from_reduce_task, "./tests/reducemap.mapdata").unwrap();
-
-    for (key, value) in map_from_map_task.clone() {
-        assert!(map_from_reduce_task.contains_key(&key));
-        assert_eq!(value, *map_from_reduce_task.get(&key).unwrap());
-    }
-    for (key, value) in map_from_reduce_task {
-        assert!(map_from_map_task.contains_key(&key));
-        assert_eq!(value, *map_from_map_task.get(&key).unwrap());
-    }
-
-    println!("Reduce tests passed successfully!");
-
-    Ok(())
-}
-
-pub fn get_test_word_count_from_result(
-    result_directory_path: &str,
-    word_to_test: &str,
-) -> std::io::Result<u32> {
-    let mut map: FxHashMap<String, u32> = FxHashMap::default();
-    reduce_directory(result_directory_path, &mut map).unwrap();
-
-    if let Some(count) = map.get(word_to_test) {
-        println!(
-            "The word '{word_to_test}' was present {} times in the result!",
-            count
-        );
-        return Ok(*count);
-    }
-
-    println!("The word '{word_to_test}' was not present in the result...");
-
-    Ok(0)
-}
-
-pub fn test_result() -> std::io::Result<()> {
-    println!("Starting manual map of the {MAP_TASKS_AMOUNT} first files...");
-    let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
-    let mut candidates = vec![];
-    for path in paths {
-        let path = path.unwrap().path();
-        if path.is_file()
-            && path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .starts_with("CC-MAIN-")
-        {
-            candidates.push(path);
-        }
-    }
-    candidates.sort();
-
-    let mut map: FxHashMap<String, u32> = FxHashMap::default();
-    for (i, file) in candidates.iter().enumerate().take(MAP_TASKS_AMOUNT) {
-        if let Some(file_path) = file.file_name() {
-            let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
-            println!("Starting {i}th map task : {name}");
-            map_file(&name, &mut map).unwrap();
-        } else {
-            panic!("Failed to start the {i}th map task.")
-        }
-    }
-
-    println!("Finished manual map of the {MAP_TASKS_AMOUNT} first files...");
-    println!(
-        "Starting manual reduce of the {REDUCE_TASKS_AMOUNT} result files in {RESULT_PATH}..."
-    );
-
-    let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
-    reduce_directory(RESULT_PATH, &mut result_map).unwrap();
-
-    if let Some(count) = map.get(WORD_TO_TEST) {
-        println!(
-            "The word '{WORD_TO_TEST}' was present {} times in the manual map!",
-            count
-        );
-    } else {
-        println!("The word '{WORD_TO_TEST}' was not present in the manual map...")
-    }
-
-    if let Some(count) = result_map.get(WORD_TO_TEST) {
-        println!(
-            "The word '{WORD_TO_TEST}' was present {} times in the result map!",
-            count
-        );
-    } else {
-        println!("The word '{WORD_TO_TEST}' was not present in the result map...")
-    }
-
-    println!("There are {} keys in the manual map", map.keys().len());
-    println!(
-        "There are {} keys in the result map",
-        result_map.keys().len()
-    );
-
-    print!("Starting comparison of result map and manual map... ");
-    io::stdout().flush().unwrap();
-    for (key, value) in map.clone() {
-        assert!(
-            result_map.contains_key(&key),
-            "Result map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            *result_map.get(&key).unwrap(),
-            "Result map had the wrong number of '{key}' : {} instead of {value}",
-            *result_map.get(&key).unwrap()
-        );
-    }
-    print!("50%... ");
-    io::stdout().flush().unwrap();
-    for (key, value) in result_map {
-        assert!(
-            map.contains_key(&key),
-            "Manual map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            *map.get(&key).unwrap(),
-            "Manual map had the wrong number of '{key}' : {} instead of {value}",
-            *map.get(&key).unwrap()
-        );
-    }
-    println!("Done.");
-
-    println!("Test passed successfully!");
-
-    Ok(())
-}
 
 pub fn test_all(
     number_of_splits: Option<usize>,
     number_of_reduces: Option<usize>,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    let number_of_splits = number_of_splits.unwrap_or(5);
-    let number_of_reduces = number_of_reduces.unwrap_or(REDUCE_TASKS_AMOUNT);
-    let mut manual_u32_map: FxHashMap<String, u32> = FxHashMap::default();
-    let mut manual_u128_map: FxHashMap<String, u128> = FxHashMap::default();
-    let mut manual_wtf_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
+    match version {
+        MapReduceVersion::Default => {
+            test_all_generic::<DefaultVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::DefaultWithLanguageSplit => {
+            test_all_generic::<DefaultWithLanguageSplitVersion>(
+                number_of_splits,
+                number_of_reduces,
+                version,
+            )
+        }
+        MapReduceVersion::LanguageCount => {
+            test_all_generic::<LanguageCountVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::LanguageSize => {
+            test_all_generic::<LanguageSizeVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::SitePageCount => {
+            test_all_generic::<SitePageCountVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::SiteSize => {
+            test_all_generic::<SiteSizeVersion>(number_of_splits, number_of_reduces, version)
+        }
+        MapReduceVersion::ReverseWebLink => {
+            test_all_generic::<ReverseWebLinkVersion>(number_of_splits, number_of_reduces, version)
+        }
+    }
+    Ok(())
+}
 
+fn assert_maps_match<I, F>(manual_map: &FxHashMap<String, I>, result_map: &FxHashMap<String, F>)
+where
+    I: serde::Serialize + std::fmt::Debug,
+    F: serde::de::DeserializeOwned + std::fmt::Debug + PartialEq,
+{
+    assert_eq!(
+        manual_map.len(),
+        result_map.len(),
+        "Maps have different sizes. Manual: {}, Result: {}",
+        manual_map.len(),
+        result_map.len()
+    );
+
+    for (key, manual_value) in manual_map {
+        // Ensure the key exists in the result map
+        let result_value = result_map.get(key).unwrap_or_else(|| {
+            panic!("Result map did not contain key '{key}'");
+        });
+
+        // Convert Intermediate (I) to Final (F) via JSON roundtrip
+        let serialized =
+            serde_json::to_string(manual_value).expect("Failed to serialize Intermediate value");
+        let converted_manual_value: F = serde_json::from_str(&serialized)
+            .expect("Failed to deserialize Intermediate structure into Final type");
+
+        // Assert equality between the two F types
+        assert_eq!(
+            &converted_manual_value, result_value,
+            "Mismatch for key '{key}': expected {manual_value:?} (converted), got {result_value:?}"
+        );
+    }
+}
+
+fn test_all_generic<T: TaskVersion>(
+    number_of_splits: Option<usize>,
+    number_of_reduces: Option<usize>,
+    version: MapReduceVersion,
+) {
+    let mut map: FxHashMap<String, T::Intermediate> = FxHashMap::default();
+    let number_of_splits = number_of_splits.unwrap_or(2);
+    let number_of_reduces = number_of_reduces.unwrap_or(5);
 
     print!("Deleting previous files... ");
     io::stdout().flush().unwrap();
@@ -234,7 +104,7 @@ pub fn test_all(
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }
-    let folder_to_delete = Path::new("/tmp/4sl07_grp3/tests/");
+    let folder_to_delete = Path::new("/tmp/4sl07_grp3");
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }
@@ -272,29 +142,8 @@ pub fn test_all(
             print!("Starting map task {i} : {name}... ");
             io::stdout().flush().unwrap();
 
-            match version {
-                MapReduceVersion::Default => {
-                    map::default::map_file(&name, &mut manual_u32_map).unwrap();
-                }
-                MapReduceVersion::DefaultWithLanguageSplit => {
-                    map::defaultwithlanguagesplit::map_file(&name, &mut manual_u32_map).unwrap();
-                }
-                MapReduceVersion::LanguageCount => {
-                    map::languagecount::map_file(&name, &mut manual_u32_map).unwrap();
-                }
-                MapReduceVersion::LanguageSize => {
-                    map::languagesize::map_file(&name, &mut manual_u128_map).unwrap();
-                } 
-                MapReduceVersion::SitePageCount => {
-                    map::sitepagecount::map_file(&name, &mut manual_u32_map).unwrap();
-                }
-                MapReduceVersion::SiteSize => {
-                    map::sitesize::map_file(&name, &mut manual_u128_map).unwrap();
-                }
-                MapReduceVersion::ReverseWebLink => {
-                    map::reverseweblink::map_file(&name, &mut manual_wtf_map).unwrap();
-                }
-            }
+            T::map_file(&name, &mut map);
+
             print!("50%... ");
             io::stdout().flush().unwrap();
             run_map_task_version(&name, number_of_reduces, i, version).unwrap();
@@ -333,29 +182,9 @@ pub fn test_all(
     print!("Reforming the map from the results and starting comparison... ");
     io::stdout().flush().unwrap();
 
-    match version {
-        MapReduceVersion::Default
-        | MapReduceVersion::DefaultWithLanguageSplit
-        | MapReduceVersion::LanguageCount
-        | MapReduceVersion::SitePageCount => {
-            let mut result_map: FxHashMap<String, u32> = FxHashMap::default();
-            reduce::default::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
-
-            assert_maps_match(&manual_u32_map, &result_map);
-        }
-        MapReduceVersion::LanguageSize | MapReduceVersion::SiteSize => {
-            let mut result_map: FxHashMap<String, u128> = FxHashMap::default();
-            reduce::languagesize::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
-
-            assert_maps_match(&manual_u128_map, &result_map);
-        }
-        MapReduceVersion::ReverseWebLink => {
-            let mut result_map: FxHashMap<String, FxHashSet<String>> = FxHashMap::default();
-            reduce::reverseweblink::reduce_directory(RESULT_PATH, &mut result_map).unwrap();
-
-            assert_maps_match(&manual_wtf_map, &result_map);
-        }
-    }
+    let mut result_map: FxHashMap<String, T::Final> = FxHashMap::default();
+    T::reduce_directory(RESULT_PATH, &mut result_map);
+    assert_maps_match(&map, &result_map);
     println!("Done.");
 
     println!();
@@ -363,35 +192,19 @@ pub fn test_all(
     println!("          Test finished successfully!          ");
     println!("===============================================");
 
-    Ok(())
-}
-
-fn assert_maps_match<V>(manual_map: &FxHashMap<String, V>, result_map: &FxHashMap<String, V>)
-where
-    V: std::fmt::Debug + PartialEq,
-{
-    for (key, value) in manual_map {
-        assert!(
-            result_map.contains_key(key),
-            "Result map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            result_map.get(key).unwrap(),
-            "Result map had the wrong value for '{key}': expected {value:?}, got {:?}",
-            result_map.get(key).unwrap()
-        );
+    print!("Cleaning up files... ");
+    io::stdout().flush().unwrap();
+    let folder_to_delete = Path::new(MAP_DATA_PATH);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
     }
-    for (key, value) in result_map {
-        assert!(
-            manual_map.contains_key(key),
-            "Manual map did not contain key '{key}'"
-        );
-        assert_eq!(
-            value,
-            manual_map.get(key).unwrap(),
-            "Manual map had the wrong value for '{key}': expected {value:?}, got {:?}",
-            manual_map.get(key).unwrap()
-        );
+    let folder_to_delete = Path::new(RESULT_PATH);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
     }
+    let folder_to_delete = Path::new("/tmp/4sl07_grp3");
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
+    }
+    println!("Done.");
 }
