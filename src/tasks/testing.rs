@@ -57,6 +57,8 @@ where
     I: serde::Serialize + std::fmt::Debug,
     F: serde::de::DeserializeOwned + std::fmt::Debug + PartialEq,
 {
+    print!("Starting comparison of the two maps...");
+    io::stdout().flush().unwrap();
     assert_eq!(
         manual_map.len(),
         result_map.len(),
@@ -83,6 +85,7 @@ where
             "Mismatch for key '{key}': expected {manual_value:?} (converted), got {result_value:?}"
         );
     }
+    println!("Done.")
 }
 
 fn test_all_generic<T: TaskVersion>(
@@ -179,8 +182,7 @@ fn test_all_generic<T: TaskVersion>(
     }
     println!("Finished reduce tasks.");
 
-    print!("Reforming the map from the results and starting comparison... ");
-    io::stdout().flush().unwrap();
+    println!("Reforming the map from the results... ");
 
     let mut result_map: FxHashMap<String, T::Final> = FxHashMap::default();
     T::reduce_directory(RESULT_PATH, &mut result_map);
