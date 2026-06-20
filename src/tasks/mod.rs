@@ -7,7 +7,6 @@ pub use map::{run_map_task, run_map_task_version};
 pub use reduce::{run_reduce_task, run_reduce_task_version};
 pub use testing::{get_test_word_count_from_result, test_all, test_map, test_reduce, test_result};
 
-#[cfg(not(feature = "prod"))]
 use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
