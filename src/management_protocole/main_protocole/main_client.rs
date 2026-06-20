@@ -442,7 +442,7 @@ async fn send_result_files(user: String, host_address: String) {
     let mut tries = 0;
     loop {
         let command_str = format!(
-            "scp -r {} {}@{}:/tmp/4sl07_grp3/",
+            "scp -r {} {}@{}:/tmp/4sl07g3/",
             crate::tasks::RESULT_PATH,
             user,
             host_address

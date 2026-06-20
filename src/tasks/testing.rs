@@ -79,7 +79,7 @@ fn test_all_generic<T: TaskVersion>(
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }
-    let folder_to_delete = Path::new("/tmp/4sl07_grp3");
+    let folder_to_delete = Path::new("/tmp/4sl07g3");
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }
@@ -134,11 +134,11 @@ fn test_all_generic<T: TaskVersion>(
     );
     io::stdout().flush().unwrap();
     for r in 0..number_of_reduces {
-        fs::create_dir_all(format!("/tmp/4sl07_grp3/tests/reduce{r}/")).unwrap();
+        fs::create_dir_all(format!("/tmp/4sl07g3/tests/reduce{r}/")).unwrap();
         for i in 0..number_of_splits {
             fs::copy(
-                format!("/tmp/4sl07_grp3/map_data/data_{r}_map_{i}.mapdata"),
-                format!("/tmp/4sl07_grp3/tests/reduce{r}/data_{r}_map_{i}.mapdata"),
+                format!("/tmp/4sl07g3/map_data/data_{r}_map_{i}.mapdata"),
+                format!("/tmp/4sl07g3/tests/reduce{r}/data_{r}_map_{i}.mapdata"),
             )
             .unwrap();
         }
@@ -149,7 +149,7 @@ fn test_all_generic<T: TaskVersion>(
     for r in 0..number_of_reduces {
         print!("Starting {r}th reduce task... ");
         io::stdout().flush().unwrap();
-        run_reduce_task_version(&format!("/tmp/4sl07_grp3/tests/reduce{r}/"), r, version).unwrap();
+        run_reduce_task_version(&format!("/tmp/4sl07g3/tests/reduce{r}/"), r, version).unwrap();
         println!("Done.");
     }
     println!("Finished reduce tasks.");
@@ -176,7 +176,7 @@ fn test_all_generic<T: TaskVersion>(
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }
-    let folder_to_delete = Path::new("/tmp/4sl07_grp3");
+    let folder_to_delete = Path::new("/tmp/4sl07g3");
     if folder_to_delete.exists() {
         fs::remove_dir_all(folder_to_delete).unwrap();
     }

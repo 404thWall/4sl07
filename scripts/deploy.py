@@ -59,7 +59,7 @@ def kill_previous_sessions(user: str, should_wait: bool) -> None:
         for i in range(0, len(hosts), batch_size):
             batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
             print(f"Killing sessions on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
-            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07-{user} & rm -rf /tmp/4sl07_grp3"], user, batch_hosts)
+            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07-{user} & rm -rf /tmp/4sl07g3"], user, batch_hosts)
             time.sleep(1)
         print("Previous sessions killed. Waiting 30s for machines to be freed...")
         if should_wait and len(hosts) > 0:
