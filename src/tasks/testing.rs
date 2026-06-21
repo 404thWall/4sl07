@@ -248,19 +248,7 @@ fn test_result_generic<T: TaskVersion>(
     println!("===============================================");
 }
 
-pub fn run_all(
-    map_count: usize,
-    reduce_count: usize,
-    version: MapReduceVersion
-) {
-    versioned!(version, run_all_generic(map_count, reduce_count, version))
-}
-
-fn run_all_generic<T: TaskVersion>(
-    map_count: usize,
-    reduce_count: usize,
-    version: MapReduceVersion
-) {
+pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion) {
     print!("Deleting previous files... ");
     io::stdout().flush().unwrap();
     let folder_to_delete = Path::new(MAP_DATA_PATH);
@@ -333,10 +321,14 @@ fn run_all_generic<T: TaskVersion>(
     for r in 0..reduce_count {
         print!("Starting reduce task {r}... ");
         io::stdout().flush().unwrap();
-        run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version).unwrap();
+        run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version)
+            .unwrap();
         println!("Done.");
     }
-    println!("Finished reduce tasks at {}s.", start.elapsed().as_secs_f64());
+    println!(
+        "Finished reduce tasks at {}s.",
+        start.elapsed().as_secs_f64()
+    );
 
     print!("Deleting intermediate files... ");
     io::stdout().flush().unwrap();
@@ -348,6 +340,4 @@ fn run_all_generic<T: TaskVersion>(
     println!("Done at {}s.", start.elapsed().as_secs_f64());
 
     println!("Finished everything in {}s", start.elapsed().as_secs_f64())
-
-
 }

@@ -6,7 +6,7 @@ use slr07::management_protocole::file_transfer_protocole::file_server::FileServe
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
     INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, RESULT_PATH,
-    run_map_task_version, run_reduce_task_version, test_all, test_result, run_all
+    run_all, run_map_task_version, run_reduce_task_version, test_all, test_result,
 };
 
 #[derive(Parser, Debug)]
@@ -205,7 +205,11 @@ async fn main() {
                 eprintln!("Error: {}", e);
             }
         }
-        Commands::RunAll { map_count, reduce_count, version } => {
+        Commands::RunAll {
+            map_count,
+            reduce_count,
+            version,
+        } => {
             println!("Running the {version} version...");
             run_all(map_count, reduce_count, version)
         }

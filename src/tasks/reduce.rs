@@ -2,9 +2,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     tasks::{
-        DEFAULT_VERSION, MapReduceVersion, RESULT_PATH,
-        saver::save_one_map_one_file,
-        versions::*,
+        DEFAULT_VERSION, MapReduceVersion, RESULT_PATH, saver::save_one_map_one_file, versions::*,
     },
     versioned,
 };

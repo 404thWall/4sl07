@@ -33,8 +33,8 @@ impl TaskVersion for CoCitationVersion {
             }
             let domain = extract_domain(url).to_ascii_lowercase();
             filtered.insert(domain);
-        };
-        let mut seen : FxHashSet<&String> = FxHashSet::default();
+        }
+        let mut seen: FxHashSet<&String> = FxHashSet::default();
         for first_site in &filtered {
             seen.insert(first_site);
             for second_site in &filtered {
@@ -50,7 +50,6 @@ impl TaskVersion for CoCitationVersion {
                     } else {
                         map.insert(key, 1);
                     }
-
                 }
             }
         }
