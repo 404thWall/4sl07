@@ -1,12 +1,4 @@
-use crate::tasks::versions::TaskVersion;
-use crate::tasks::versions::default::DefaultVersion;
-use crate::tasks::versions::defaultwithlanguagesplit::DefaultWithLanguageSplitVersion;
-use crate::tasks::versions::inoutlinks::InOutLinksVersion;
-use crate::tasks::versions::languagecount::LanguageCountVersion;
-use crate::tasks::versions::languagesize::LanguageSizeVersion;
-use crate::tasks::versions::reverseweblink::ReverseWebLinkVersion;
-use crate::tasks::versions::sitepagecount::SitePageCountVersion;
-use crate::tasks::versions::sitesize::SiteSizeVersion;
+use crate::tasks::versions::*;
 use crate::tasks::{
     MAP_DATA_PATH, MapReduceVersion, run_map_task_version, run_reduce_task_version,
 };
@@ -18,13 +10,17 @@ use rustc_hash::FxHashMap;
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
+use std::time::Instant;
 
 pub fn test_all(
     number_of_splits: Option<usize>,
     number_of_reduces: Option<usize>,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    versioned!(version, test_all_generic(number_of_splits, number_of_reduces, version));
+    versioned!(
+        version,
+        test_all_generic(number_of_splits, number_of_reduces, version)
+    );
     Ok(())
 }
 
@@ -198,7 +194,10 @@ pub fn test_result(
     map_tasks_amount: usize,
     version: MapReduceVersion,
 ) -> std::io::Result<()> {
-    versioned!(version, test_result_generic(initial_data_path, result_path, map_tasks_amount));
+    versioned!(
+        version,
+        test_result_generic(initial_data_path, result_path, map_tasks_amount)
+    );
     Ok(())
 }
 
@@ -247,4 +246,108 @@ fn test_result_generic<T: TaskVersion>(
     println!("===============================================");
     println!("          Test finished successfully!          ");
     println!("===============================================");
+}
+
+pub fn run_all(
+    map_count: usize,
+    reduce_count: usize,
+    version: MapReduceVersion
+) {
+    versioned!(version, run_all_generic(map_count, reduce_count, version))
+}
+
+fn run_all_generic<T: TaskVersion>(
+    map_count: usize,
+    reduce_count: usize,
+    version: MapReduceVersion
+) {
+    print!("Deleting previous files... ");
+    io::stdout().flush().unwrap();
+    let folder_to_delete = Path::new(MAP_DATA_PATH);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
+    }
+    let truc = format!("{MAP_DATA_PATH}../tests/");
+    let folder_to_delete = Path::new(&truc);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
+    }
+    let folder_to_delete = Path::new(RESULT_PATH);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
+    }
+    println!("Done.");
+
+    print!("Fetching the list of files... ");
+    io::stdout().flush().unwrap();
+    let paths = std::fs::read_dir(INITIAL_DATA_PATH).unwrap();
+    let mut candidates = vec![];
+    for path in paths {
+        let path = path.unwrap().path();
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("CC-MAIN-")
+        {
+            candidates.push(path);
+        }
+    }
+    candidates.sort();
+    println!("Done.");
+
+    let start = Instant::now();
+
+    println!("Starting the map tasks...");
+    for (i, file) in candidates.iter().enumerate().take(map_count) {
+        if let Some(file_path) = file.file_name() {
+            let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
+            print!("Starting map task {i} : {name}... ");
+            io::stdout().flush().unwrap();
+            run_map_task_version(&name, reduce_count, i, version).unwrap();
+            println!("Done.");
+        } else {
+            panic!("Failed to start map task {i}.")
+        }
+    }
+    println!("Finished map tasks at {}s.", start.elapsed().as_secs_f64());
+    print!(
+        "Starting copying the outputs to temporary reduces folder (to simulate the exchange)... "
+    );
+    io::stdout().flush().unwrap();
+    for r in 0..reduce_count {
+        fs::create_dir_all(format!("{MAP_DATA_PATH}../tests/reduce{r}/")).unwrap();
+        for i in 0..map_count {
+            fs::rename(
+                format!("{MAP_DATA_PATH}data_{r}_map_{i}.mapdata"),
+                format!("{MAP_DATA_PATH}../tests/reduce{r}/data_{r}_map_{i}.mapdata"),
+            )
+            .unwrap();
+        }
+    }
+    println!("Done at {}s.", start.elapsed().as_secs_f64());
+
+    println!("Starting reduce tasks...");
+    for r in 0..reduce_count {
+        print!("Starting reduce task {r}... ");
+        io::stdout().flush().unwrap();
+        run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version).unwrap();
+        println!("Done.");
+    }
+    println!("Finished reduce tasks at {}s.", start.elapsed().as_secs_f64());
+
+    print!("Deleting intermediate files... ");
+    io::stdout().flush().unwrap();
+    let truc = format!("{MAP_DATA_PATH}../tests/");
+    let folder_to_delete = Path::new(&truc);
+    if folder_to_delete.exists() {
+        fs::remove_dir_all(folder_to_delete).unwrap();
+    }
+    println!("Done at {}s.", start.elapsed().as_secs_f64());
+
+    println!("Finished everything in {}s", start.elapsed().as_secs_f64())
+
+
 }

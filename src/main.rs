@@ -6,7 +6,7 @@ use slr07::management_protocole::file_transfer_protocole::file_server::FileServe
 use slr07::management_protocole::main_protocole::main_server::MainServer;
 use slr07::tasks::{
     INITIAL_DATA_PATH, MAP_TASKS_AMOUNT, MapReduceVersion, REDUCE_TASKS_AMOUNT, RESULT_PATH,
-    run_map_task_version, run_reduce_task_version, test_all, test_result,
+    run_map_task_version, run_reduce_task_version, test_all, test_result, run_all
 };
 
 #[derive(Parser, Debug)]
@@ -70,6 +70,14 @@ enum Commands {
         #[arg(short, long, default_value_t = MAP_TASKS_AMOUNT)]
         map_count: usize,
         #[arg(short, long, default_value_t = REDUCE_TASKS_AMOUNT)]
+        reduce_count: usize,
+        #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
+        version: MapReduceVersion,
+    },
+    RunAll {
+        #[arg(short, long, default_value_t = MAP_TASKS_AMOUNT)]
+        map_count: usize,
+        #[arg(short, long, default_value_t = 20)]
         reduce_count: usize,
         #[arg(short, long, value_enum, default_value_t = MapReduceVersion::DefaultWithLanguageSplit)]
         version: MapReduceVersion,
@@ -196,6 +204,10 @@ async fn main() {
             if let Err(e) = test_all(Some(map_count), Some(reduce_count), version) {
                 eprintln!("Error: {}", e);
             }
+        }
+        Commands::RunAll { map_count, reduce_count, version } => {
+            println!("Running the {version} version...");
+            run_all(map_count, reduce_count, version)
         }
         Commands::TestDownload => {
             println!("Testing the download of the commoncrawl files...");
