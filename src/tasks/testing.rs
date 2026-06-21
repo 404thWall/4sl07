@@ -249,6 +249,10 @@ fn test_result_generic<T: TaskVersion>(
 }
 
 pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion) {
+    println!("Running with: ");
+    println!("  map_count    = {map_count}");
+    println!("  reduce_count = {reduce_count}");
+    println!("  version      = {}", version);
     print!("Deleting previous files... ");
     io::stdout().flush().unwrap();
     let folder_to_delete = Path::new(MAP_DATA_PATH);
@@ -286,21 +290,45 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
     candidates.sort();
     println!("Done.");
 
+    let mut map_input_size: f64 = 0.;
+    let mut map_output_size: f64 = 0.;
+    let mut map_reading_time: f64 = 0.;
+    let mut map_mapping_time: f64 = 0.;
+    let mut map_saving_time: f64 = 0.;
+
+    let mut reduce_input_size: f64 = 0.;
+    let mut reduce_output_size: f64 = 0.;
+    let mut reduce_reducing_time: f64 = 0.;
+
     let start = Instant::now();
 
     println!("Starting the map tasks...");
     for (i, file) in candidates.iter().enumerate().take(map_count) {
         if let Some(file_path) = file.file_name() {
             let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
-            print!("Starting map task {i} : {name}... ");
+            print!("Map task {i}: ");
             io::stdout().flush().unwrap();
             let ret = run_map_task_version(&name, reduce_count, i, version).unwrap();
-            println!("Done: {ret:?}");
+            map_reading_time += ret.first().unwrap().1;
+            map_mapping_time += ret.get(1).unwrap().1;
+            map_input_size += ret.get(2).unwrap().1;
+            map_saving_time += ret.get(3).unwrap().1;
+            map_output_size += ret.get(4).unwrap().1;
+            println!("{ret:?}. ETA: {:.1}s", (map_mapping_time + map_reading_time + map_saving_time) * ((map_count - i - 1) as f64 / (i + 1) as f64));
         } else {
             panic!("Failed to start map task {i}.")
         }
     }
     println!("Finished map tasks at {}s.", start.elapsed().as_secs_f64());
+
+    println!();
+    println!("Total input size:   {map_input_size}");
+    println!("Total output size:  {map_output_size}");
+    println!("Total reading time: {map_reading_time}");
+    println!("Total mapping time: {map_mapping_time}");
+    println!("Total saving time:  {map_saving_time}");
+    println!();
+
     print!(
         "Starting copying the outputs to temporary reduces folder (to simulate the exchange)... "
     );
@@ -321,14 +349,24 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
     for r in 0..reduce_count {
         print!("Starting reduce task {r}... ");
         io::stdout().flush().unwrap();
-        let ret = run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version)
-            .unwrap();
-        println!("Done: {ret:?}");
+        let ret =
+            run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version)
+                .unwrap();
+        reduce_input_size += ret.first().unwrap().1;
+        reduce_output_size += ret.get(1).unwrap().1;
+        reduce_reducing_time += ret.get(2).unwrap().1;
+        println!("Done: {ret:?}. Reduce ETA: {:.1}s", (reduce_reducing_time) * ((reduce_count - r - 1) as f64 / (r + 1) as f64));
     }
     println!(
         "Finished reduce tasks at {}s.",
         start.elapsed().as_secs_f64()
     );
+
+    println!();
+    println!("Total input size:   {reduce_input_size}");
+    println!("Total output size:  {reduce_output_size}");
+    println!("Total reading time: {reduce_reducing_time}");
+    println!();
 
     print!("Deleting intermediate files... ");
     io::stdout().flush().unwrap();

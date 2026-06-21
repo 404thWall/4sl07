@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -27,12 +29,15 @@ fn run_generic_reduce_task<T: TaskVersion>(
     reduce_id: usize,
 ) -> std::io::Result<Vec<(String, f64)>> {
     let mut map: FxHashMap<String, T::Final> = FxHashMap::default();
+    let start = Instant::now();
     let input_size = T::reduce_directory(directory_path, &mut map);
+    let end = start.elapsed().as_secs_f64();
     let output_size =
         save_one_map_one_file(&map, &format!("{RESULT_PATH}reduce_{reduce_id}.mapdata")).unwrap();
     let ret: Vec<(String, f64)> = vec![
         ("input_size".to_string(), input_size as f64),
         ("output_size".to_string(), output_size),
+        ("reducing_time".to_string(), end),
     ];
     Ok(ret)
 }
