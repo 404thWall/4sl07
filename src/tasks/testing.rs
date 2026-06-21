@@ -294,8 +294,8 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
             let name = format!("{}{}", INITIAL_DATA_PATH, file_path.to_str().unwrap());
             print!("Starting map task {i} : {name}... ");
             io::stdout().flush().unwrap();
-            run_map_task_version(&name, reduce_count, i, version).unwrap();
-            println!("Done.");
+            let ret = run_map_task_version(&name, reduce_count, i, version).unwrap();
+            println!("Done: {ret:?}");
         } else {
             panic!("Failed to start map task {i}.")
         }
@@ -321,9 +321,9 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
     for r in 0..reduce_count {
         print!("Starting reduce task {r}... ");
         io::stdout().flush().unwrap();
-        run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version)
+        let ret = run_reduce_task_version(&format!("{MAP_DATA_PATH}../tests/reduce{r}/"), r, version)
             .unwrap();
-        println!("Done.");
+        println!("Done: {ret:?}");
     }
     println!(
         "Finished reduce tasks at {}s.",
