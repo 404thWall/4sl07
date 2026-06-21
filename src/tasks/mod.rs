@@ -30,9 +30,9 @@ struct TasksConfig {
 const CONFIG: TasksConfig = TasksConfig {
     wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/wet.paths.gz",
     initial_data_path: "/cal/commoncrawl/",
-    map_data_path: "/home/users/edanesi-24/4sl07_grp3/map_data/",
+    map_data_path: "/tmp/4sl07_grp3/map_data/",
     reduce_initial_data_path: "/tmp/4sl07_grp3/to_reduce/",
-    result_path: "//home/users/edanesi-24/4sl07_grp3/result/",
+    result_path: "/tmp/4sl07_grp3/result/",
     tmp_dir: "/tmp/4sl07_grp3/tmp/",
     timing_analysis_file_path: "/tmp/4sl07_grp3/timing_analysis.json",
     folders_to_delete: &[
