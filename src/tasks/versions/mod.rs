@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 
 use crate::tasks::saver::load_map;
 
+pub mod cocitation;
 pub mod default;
 pub mod defaultwithlanguagesplit;
 pub mod inoutlinks;
@@ -19,8 +20,19 @@ pub mod reverseweblink;
 pub mod sitepagecount;
 pub mod sitesize;
 
+pub use cocitation::CoCitationVersion;
+pub use default::DefaultVersion;
+pub use defaultwithlanguagesplit::DefaultWithLanguageSplitVersion;
+pub use inoutlinks::InOutLinksVersion;
+pub use languagecount::LanguageCountVersion;
+pub use languagesize::LanguageSizeVersion;
+pub use reverseweblink::ReverseWebLinkVersion;
+pub use sitepagecount::SitePageCountVersion;
+pub use sitesize::SiteSizeVersion;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum MapReduceVersion {
+    CoCitation,
     Default,
     DefaultWithLanguageSplit,
     InOutLinks,
@@ -36,6 +48,7 @@ pub enum MapReduceVersion {
 macro_rules! versioned {
     ($version:expr, $func:ident ($($args:expr),* $(,)?)) => {
         match $version {
+            MapReduceVersion::CoCitation => $func::<CoCitationVersion>($($args),*),
             MapReduceVersion::Default => $func::<DefaultVersion>($($args),*),
             MapReduceVersion::DefaultWithLanguageSplit => $func::<DefaultWithLanguageSplitVersion>($($args),*),
             MapReduceVersion::InOutLinks => $func::<InOutLinksVersion>($($args),*),
@@ -44,7 +57,7 @@ macro_rules! versioned {
             MapReduceVersion::ReverseWebLink => $func::<ReverseWebLinkVersion>($($args),*),
             MapReduceVersion::SitePageCount => $func::<SitePageCountVersion>($($args),*),
             MapReduceVersion::SiteSize => $func::<SiteSizeVersion>($($args),*),
-            
+
         }
     };
 }

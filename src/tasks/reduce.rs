@@ -1,16 +1,13 @@
 use rustc_hash::FxHashMap;
 
-use crate::{tasks::{
-    DEFAULT_VERSION, MapReduceVersion, RESULT_PATH,
-    saver::save_one_map_one_file,
-    versions::{
-        TaskVersion, default::DefaultVersion,
-        defaultwithlanguagesplit::DefaultWithLanguageSplitVersion, inoutlinks::InOutLinksVersion,
-        languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion,
-        reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion,
-        sitesize::SiteSizeVersion,
+use crate::{
+    tasks::{
+        DEFAULT_VERSION, MapReduceVersion, RESULT_PATH,
+        saver::save_one_map_one_file,
+        versions::*,
     },
-}, versioned};
+    versioned,
+};
 
 pub fn run_reduce_task(
     directory_path: &str,

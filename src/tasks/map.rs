@@ -2,17 +2,14 @@ use std::time::Instant;
 
 use rustc_hash::FxHashMap;
 
-use crate::{tasks::{
-    DEFAULT_VERSION, MAP_DATA_PATH, MapReduceVersion,
-    saver::save_one_map_r_files,
-    versions::{
-        TaskVersion, default::DefaultVersion,
-        defaultwithlanguagesplit::DefaultWithLanguageSplitVersion, inoutlinks::InOutLinksVersion,
-        languagecount::LanguageCountVersion, languagesize::LanguageSizeVersion,
-        reverseweblink::ReverseWebLinkVersion, sitepagecount::SitePageCountVersion,
-        sitesize::SiteSizeVersion,
+use crate::{
+    tasks::{
+        DEFAULT_VERSION, MAP_DATA_PATH, MapReduceVersion,
+        saver::save_one_map_r_files,
+        versions::*,
     },
-}, versioned};
+    versioned,
+};
 
 pub fn run_map_task(path: &str, r: usize, map_id: usize) -> std::io::Result<Vec<(String, f64)>> {
     run_map_task_version(path, r, map_id, DEFAULT_VERSION)
