@@ -222,125 +222,132 @@ impl ServerHandler for MainServer {
         }
         println!("Ping task for {} stopped", addr);
 
-        // Remove the worker from the connected workers
-        CONNECTED_FILE_PORT.write().await.remove(&addr);
-        println!("Worker {} removed from connected workers", addr);
+        return end_connection(addr).await;
+    }
+}
 
-        if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Finished {
+async fn end_connection(addr: String) -> Result<(), ProtocolError> {
+    // Remove the worker from the connected workers
+    if CONNECTED_FILE_PORT.write().await.remove(&addr).is_none() {
+        println!("Worker {} was not in the connected workers list, ignoring", addr);
+        return Ok(());
+    }
+    println!("Worker {} removed from connected workers", addr);
+
+    if CURRENT_PHASE.load(atomic::Ordering::SeqCst) == ProtocolePhase::Finished {
+        println!(
+            "Worker {} disconnected after the protocole is finished, ignoring",
+            addr
+        );
+
+        // If there are no more connected workers, stop the server
+        if CONNECTED_FILE_PORT.read().await.is_empty() {
+            let path = Path::new(TIMING_ANALYSIS_FILE_PATH);
+            let save_directory = path.parent().unwrap();
+            fs::create_dir_all(save_directory)?;
+
+            let write_file = File::create(path)?;
+            let writer = BufWriter::new(write_file);
+            let timing_analysis = TIMING_ANALYSIS.read().await;
+            let e = serde_json::to_writer_pretty(writer, &*timing_analysis);
+            if e.is_err() {
+                println!("Error writing : {:?}", e);
+            }
+
+            println!("================================");
+            println!("All workers disconnected, stopping server...");
+            let elapsed_time = MAIN_TIME.elapsed();
+            println!("Total elapsed time: {:?}", elapsed_time);
             println!(
-                "Worker {} disconnected after the protocole is finished, ignoring",
-                addr
+                "Average elapsed time (ms) for all map tasks: {}",
+                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst)
+                    / MAP_TASKS_AMOUNT as u64
             );
-
-            // If there are no more connected workers, stop the server
-            if CONNECTED_FILE_PORT.read().await.is_empty() {
-                let path = Path::new(TIMING_ANALYSIS_FILE_PATH);
-                let save_directory = path.parent().unwrap();
-                fs::create_dir_all(save_directory)?;
-
-                let write_file = File::create(path)?;
-                let writer = BufWriter::new(write_file);
-                let timing_analysis = TIMING_ANALYSIS.read().await;
-                let e = serde_json::to_writer_pretty(writer, &*timing_analysis);
-                if e.is_err() {
-                    println!("Error writing : {:?}", e);
-                }
-
-                println!("================================");
-                println!("All workers disconnected, stopping server...");
-                let elapsed_time = MAIN_TIME.elapsed();
-                println!("Total elapsed time: {:?}", elapsed_time);
-                println!(
-                    "Average elapsed time (ms) for all map tasks: {}",
-                    AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst)
-                        / MAP_TASKS_AMOUNT as u64
-                );
-                println!(
-                    "Average elapsed time (ms) for all reduce tasks: {}",
-                    AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
-                        / REDUCE_TASKS_AMOUNT as u64
-                );
-                println!("================================");
-                std::process::exit(0);
-            }
-
-            return Ok(());
-        }
-
-        // Mark any map task assigned to this worker as unfinished so that it can be reassigned to another worker
-        let mut finished_map_tasks = MAP_TASKS_FINISHED.write().await;
-        for i in 0..MAP_TASKS_AMOUNT {
-            if finished_map_tasks.0[i] == addr {
-                println!(
-                    "Worker {} disconnected after having done Map task {}, marking it as unfinished",
-                    addr, i
-                );
-                finished_map_tasks.0[i] = String::new();
-                finished_map_tasks.1 -= 1;
-                MAP_TASK_QUEUE
-                    .write()
-                    .await
-                    .push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
-                CURRENT_PHASE.store(ProtocolePhase::Map, atomic::Ordering::SeqCst);
-                RESULT_FILES_SENT.write().await.clear();
-            }
-        }
-        drop(finished_map_tasks);
-
-        let mut finished_reduce_tasks = REDUCE_TASKS_FINISHED.write().await;
-        for i in 0..REDUCE_TASKS_AMOUNT {
-            if finished_reduce_tasks.0[i] == addr {
-                println!(
-                    "Worker {} disconnected after having done Reduce task {}, marking it as unfinished",
-                    addr, i
-                );
-                finished_reduce_tasks.0[i] = String::new();
-                finished_reduce_tasks.1 -= 1;
-                REDUCE_TASK_QUEUE
-                    .write()
-                    .await
-                    .push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));
-                // Unfortunately, it isn't atomic...
-                if CURRENT_PHASE.load(atomic::Ordering::SeqCst) != ProtocolePhase::Map {
-                    CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
-                }
-                RESULT_FILES_SENT.write().await.clear();
-            }
-        }
-        drop(finished_reduce_tasks);
-
-        let in_progress = TASKS_IN_PROGRESS.read().await.get(&addr).cloned();
-        if let Some(Some(task)) = in_progress {
             println!(
-                "Worker {} disconnected during task {:?}, marking it as unfinished",
-                addr, task
+                "Average elapsed time (ms) for all reduce tasks: {}",
+                AVERAGE_ELAPSED_REDUCE_TIME.load(atomic::Ordering::SeqCst)
+                    / REDUCE_TASKS_AMOUNT as u64
             );
-            TASKS_IN_PROGRESS
+            println!("================================");
+            std::process::exit(0);
+        }
+
+        return Ok(());
+    }
+
+    // Mark any map task assigned to this worker as unfinished so that it can be reassigned to another worker
+    let mut finished_map_tasks = MAP_TASKS_FINISHED.write().await;
+    for i in 0..MAP_TASKS_AMOUNT {
+        if finished_map_tasks.0[i] == addr {
+            println!(
+                "Worker {} disconnected after having done Map task {}, marking it as unfinished",
+                addr, i
+            );
+            finished_map_tasks.0[i] = String::new();
+            finished_map_tasks.1 -= 1;
+            MAP_TASK_QUEUE
                 .write()
                 .await
-                .insert(addr.to_string(), None);
-            match task {
-                Task::Map(_, _) => MAP_TASK_QUEUE.write().await.push(task),
-                Task::Reduce(_, _) => REDUCE_TASK_QUEUE.write().await.push(task),
-                _ => {}
-            };
+                .push(Task::Map(i as u32, MAP_TASKS_AMOUNT as u32));
+            CURRENT_PHASE.store(ProtocolePhase::Map, atomic::Ordering::SeqCst);
+            RESULT_FILES_SENT.write().await.clear();
         }
-
-        let mut map_result_files = MAP_RESULT_FILES.write().await;
-        for (reduce_key, set) in map_result_files.iter_mut() {
-            if set.remove(&addr) {
-                println!(
-                    "Worker {} had result files for Reduce task {}, removing it from the list of workers for this task",
-                    addr, reduce_key
-                );
-            }
-        }
-        drop(map_result_files);
-
-        // Remove the worker from the result files sent
-        RESULT_FILES_SENT.write().await.remove(&addr);
-        Ok(())
     }
+    drop(finished_map_tasks);
+
+    let mut finished_reduce_tasks = REDUCE_TASKS_FINISHED.write().await;
+    for i in 0..REDUCE_TASKS_AMOUNT {
+        if finished_reduce_tasks.0[i] == addr {
+            println!(
+                "Worker {} disconnected after having done Reduce task {}, marking it as unfinished",
+                addr, i
+            );
+            finished_reduce_tasks.0[i] = String::new();
+            finished_reduce_tasks.1 -= 1;
+            REDUCE_TASK_QUEUE
+                .write()
+                .await
+                .push(Task::Reduce(i as u32, REDUCE_TASKS_AMOUNT as u32));
+            // Unfortunately, it isn't atomic...
+            if CURRENT_PHASE.load(atomic::Ordering::SeqCst) != ProtocolePhase::Map {
+                CURRENT_PHASE.store(ProtocolePhase::Reduce, atomic::Ordering::SeqCst);
+            }
+            RESULT_FILES_SENT.write().await.clear();
+        }
+    }
+    drop(finished_reduce_tasks);
+
+    let in_progress = TASKS_IN_PROGRESS.read().await.get(&addr).cloned();
+    if let Some(Some(task)) = in_progress {
+        println!(
+            "Worker {} disconnected during task {:?}, marking it as unfinished",
+            addr, task
+        );
+        TASKS_IN_PROGRESS
+            .write()
+            .await
+            .insert(addr.to_string(), None);
+        match task {
+            Task::Map(_, _) => MAP_TASK_QUEUE.write().await.push(task),
+            Task::Reduce(_, _) => REDUCE_TASK_QUEUE.write().await.push(task),
+            _ => {}
+        };
+    }
+
+    let mut map_result_files = MAP_RESULT_FILES.write().await;
+    for (reduce_key, set) in map_result_files.iter_mut() {
+        if set.remove(&addr) {
+            println!(
+                "Worker {} had result files for Reduce task {}, removing it from the list of workers for this task",
+                addr, reduce_key
+            );
+        }
+    }
+    drop(map_result_files);
+
+    // Remove the worker from the result files sent
+    RESULT_FILES_SENT.write().await.remove(&addr);
+    Ok(())
 }
 
 async fn add_timing_analysis(protocol_phase: ProtocolePhase, timing_analysis: Vec<(String, f64)>) {
@@ -383,6 +390,8 @@ async fn server_ping_task(tx: &mut Sender<OutMsg>, addr: &std::net::SocketAddr) 
                 addr
             );
             tx.send(OutMsg::MsgClose).await.ok();
+            end_connection(addr.to_string()).await.ok();
+
             break;
         }
     }
