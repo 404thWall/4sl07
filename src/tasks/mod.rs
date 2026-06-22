@@ -9,6 +9,9 @@ pub use testing::{run_all, test_all, test_result};
 
 use crate::tasks::MapReduceVersion::DefaultWithLanguageSplit;
 
+#[cfg(feature = "prod")]
+use const_str::concat;
+
 pub use versions::MapReduceVersion;
 
 #[derive(Copy, Clone)]
@@ -28,20 +31,27 @@ struct TasksConfig {
 }
 
 #[cfg(feature = "prod")]
+const BASE_PATH: &str = const_str::replace!(
+    const_str::replace!(include_str!("../../COMMON_PATH"), "\n", ""),
+    "\r", 
+    ""
+);
+
+#[cfg(feature = "prod")]
 const CONFIG: TasksConfig = TasksConfig {
     wet_paths_url: "https://data.commoncrawl.org/crawl-data/CC-MAIN-2023-14/wet.paths.gz",
     initial_data_path: "/cal/commoncrawl/",
-    map_data_path: "/tmp/4sl07g3/map_data/",
-    reduce_initial_data_path: "/tmp/4sl07g3/to_reduce/",
-    result_path: "/tmp/4sl07g3/result/",
-    result_scp_path: "/tmp/4sl07g3/",
-    tmp_dir: "/tmp/4sl07g3/tmp/",
-    timing_analysis_file_path: "/tmp/4sl07g3/timing_analysis.json",
+    map_data_path: concat!(BASE_PATH, "map_data/"),
+    reduce_initial_data_path: concat!(BASE_PATH, "to_reduce/"),
+    result_path: concat!(BASE_PATH, "result/"),
+    result_scp_path: concat!(BASE_PATH, ""),
+    tmp_dir: concat!(BASE_PATH, "tmp/"),
+    timing_analysis_file_path: concat!(BASE_PATH, "timing_analysis.json"),
     folders_to_delete: &[
-        "/tmp/4sl07g3/result",
-        "/tmp/4sl07g3/map_data/",
-        "/tmp/4sl07g3/to_reduce/",
-        "/tmp/4sl07g3/tmp/",
+        concat!(BASE_PATH, "result/"),
+        concat!(BASE_PATH, "map_data/"),
+        concat!(BASE_PATH, "to_reduce/"),
+        concat!(BASE_PATH, "tmp/"),
     ],
     map_tasks_amount: 1000,
     reduce_tasks_amount: 250,
