@@ -442,10 +442,11 @@ async fn send_result_files(user: String, host_address: String) {
     let mut tries = 0;
     loop {
         let command_str = format!(
-            "scp -r {} {}@{}:/tmp/4sl07g3/",
+            "scp -r {} {}@{}:{}",
             crate::tasks::RESULT_PATH,
             user,
-            host_address
+            host_address,
+            crate::tasks::RESULT_SCP_PATH,
         );
 
         if let Ok(c_command) = CString::new(command_str) {

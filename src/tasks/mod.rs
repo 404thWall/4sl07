@@ -18,6 +18,7 @@ struct TasksConfig {
     map_data_path: &'static str,
     reduce_initial_data_path: &'static str,
     result_path: &'static str,
+    result_scp_path: &'static str,
     tmp_dir: &'static str,
     timing_analysis_file_path: &'static str,
     folders_to_delete: &'static [&'static str],
@@ -33,6 +34,7 @@ const CONFIG: TasksConfig = TasksConfig {
     map_data_path: "/tmp/4sl07g3/map_data/",
     reduce_initial_data_path: "/tmp/4sl07g3/to_reduce/",
     result_path: "/tmp/4sl07g3/result/",
+    result_scp_path: "/tmp/4sl07g3/",
     tmp_dir: "/tmp/4sl07g3/tmp/",
     timing_analysis_file_path: "/tmp/4sl07g3/timing_analysis.json",
     folders_to_delete: &[
@@ -53,6 +55,7 @@ const CONFIG: TasksConfig = TasksConfig {
     map_data_path: "./map_data/",
     reduce_initial_data_path: "./to_reduce/",
     result_path: "../result/",
+    result_scp_path: "../",
     tmp_dir: "./tmp/",
     timing_analysis_file_path: "./timing_analysis.json",
     folders_to_delete: &["./map_data/", "./tmp/"],
@@ -66,6 +69,7 @@ pub const INITIAL_DATA_PATH: &str = CONFIG.initial_data_path;
 pub const MAP_DATA_PATH: &str = CONFIG.map_data_path;
 pub const REDUCE_INITIAL_DATA_PATH: &str = CONFIG.reduce_initial_data_path;
 pub const RESULT_PATH: &str = CONFIG.result_path;
+pub const RESULT_SCP_PATH: &str = CONFIG.result_scp_path;
 pub const TMP_DIR: &str = CONFIG.tmp_dir;
 pub const TIMING_ANALYSIS_FILE_PATH: &str = CONFIG.timing_analysis_file_path;
 pub const FOLDERS_TO_DELETE: &[&str] = CONFIG.folders_to_delete;
