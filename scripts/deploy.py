@@ -15,6 +15,14 @@ from log_commands import load_config, save_config, log_execution
 REMOTE_PATH = "~/4sl07/deploy/"
 CMD_TIMEOUT = 15  # seconds
 
+# Read the COMMON_PATH file to get the base path for temporary files
+TMP_PATH = "/tmp/"
+try:
+    with open("COMMON_PATH", "r") as f:
+            TMP_PATH = f.read().strip().replace("\r", "")
+except FileNotFoundError:
+    print("COMMON_PATH file not found. Please ensure it exists.")
+
 def run_process(cmd: list[str]):
     try:
         subprocess.run(cmd, check=True)
@@ -59,7 +67,7 @@ def kill_previous_sessions(user: str, should_wait: bool) -> None:
         for i in range(0, len(hosts), batch_size):
             batch_hosts = hosts[i:min(i+batch_size, len(hosts))]
             print(f"Killing sessions on hosts: {', '.join(batch_hosts)} ({i+1} / {len(hosts)})...")
-            run_command_batch(["ssh", "{user}@{host}", "tmux kill-session -t 4sl07-{user} & rm -rf /tmp/4sl07g3"], user, batch_hosts)
+            run_command_batch(["ssh", "{user}@{host}", f"tmux kill-session -t 4sl07-{user} & rm -rf {TMP_PATH}"], user, batch_hosts)
             time.sleep(1)
         print("Previous sessions killed. Waiting 30s for machines to be freed...")
         if should_wait and len(hosts) > 0:
