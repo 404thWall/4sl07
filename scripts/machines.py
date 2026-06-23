@@ -13,7 +13,15 @@ from urllib.request import Request, urlopen
 # Define your blacklisted hosts or prefixes here
 BLACKLIST = {
     "tp-1a201",
-    "tp-102",
+    "tp-1a207",
+    "tp-1a226",
+    "tp-1a252",
+    "tp-1a260",
+    "tp-1d23",
+    "tp-3a209",
+    "tp-4b01",
+    "tp-5b01",
+    "tp-5b07",
 }
 
 @dataclass
@@ -26,7 +34,7 @@ class Machine:
 class MachineState:
     def __init__(self, blacklist: set[str] | None = None) -> None:
         self.machines: list[Machine] = []
-        self.blacklist = blacklist or set()
+        self.blacklist = blacklist or BLACKLIST
 
     def _is_blacklisted(self, host: str) -> bool:
         """Checks if a host or its room prefix is in the blacklist."""
