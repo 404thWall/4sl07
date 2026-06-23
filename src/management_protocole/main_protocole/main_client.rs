@@ -51,11 +51,11 @@ impl ClientHandler for MainClient {
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
             Packet::Ping => {
-                println!("Received Ping, sending Pong...");
+                println!("Received Ping at {:?}, sending Pong...", std::time::Instant::now());
                 Ok(Some(Packet::Pong))
             }
             Packet::Pong => {
-                println!("Received Pong");
+                println!("Received Pong at {:?}", std::time::Instant::now());
                 Ok(None)
             }
             Packet::GiveTask { task, files_hosts } => {
