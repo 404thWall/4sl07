@@ -51,7 +51,10 @@ impl ClientHandler for MainClient {
     ) -> Result<Option<Packet>, ProtocolError> {
         match packet {
             Packet::Ping => {
-                println!("Received Ping at {:?}, sending Pong...", std::time::Instant::now());
+                println!(
+                    "Received Ping at {:?}, sending Pong...",
+                    std::time::Instant::now()
+                );
                 Ok(Some(Packet::Pong))
             }
             Packet::Pong => {

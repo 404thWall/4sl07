@@ -112,7 +112,12 @@ impl ServerHandler for MainServer {
         tx: Sender<OutMsg>,
         addr: SocketAddr,
     ) -> Result<Option<Packet>, ProtocolError> {
-        if CONNECTED_FILE_PORT.read().await.get(&addr.to_string()).is_none() {
+        if CONNECTED_FILE_PORT
+            .read()
+            .await
+            .get(&addr.to_string())
+            .is_none()
+        {
             if let Packet::Connect(_) = packet {
                 // Do nothing
             } else {
@@ -120,7 +125,12 @@ impl ServerHandler for MainServer {
                     "Received packet {:?} from {} but the worker is not connected, ignoring",
                     packet, addr
                 );
-                tx.send(OutMsg::MsgPacket(Packet::GiveTask { task: Task::None, files_hosts: vec![] })).await.ok();
+                tx.send(OutMsg::MsgPacket(Packet::GiveTask {
+                    task: Task::None,
+                    files_hosts: vec![],
+                }))
+                .await
+                .ok();
                 return Ok(None);
             }
         }
@@ -242,7 +252,10 @@ impl ServerHandler for MainServer {
 async fn end_connection(addr: String) -> Result<(), ProtocolError> {
     // Remove the worker from the connected workers
     if CONNECTED_FILE_PORT.write().await.remove(&addr).is_none() {
-        println!("Worker {} was not in the connected workers list, ignoring", addr);
+        println!(
+            "Worker {} was not in the connected workers list, ignoring",
+            addr
+        );
         return Ok(());
     }
     println!("Worker {} removed from connected workers", addr);
@@ -273,8 +286,7 @@ async fn end_connection(addr: String) -> Result<(), ProtocolError> {
             println!("Total elapsed time: {:?}", elapsed_time);
             println!(
                 "Average elapsed time (ms) for all map tasks: {}",
-                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst)
-                    / MAP_TASKS_AMOUNT as u64
+                AVERAGE_ELAPSED_MAP_TIME.load(atomic::Ordering::SeqCst) / MAP_TASKS_AMOUNT as u64
             );
             println!(
                 "Average elapsed time (ms) for all reduce tasks: {}",
