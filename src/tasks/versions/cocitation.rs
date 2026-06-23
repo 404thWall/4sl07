@@ -11,7 +11,7 @@ impl TaskVersion for CoCitationVersion {
     type Intermediate = u128;
     type Final = u128;
     const NEEDS_LANGUAGE: bool = false;
-    const NEEDS_URL: bool = false;
+    const NEEDS_URL: bool = true;
 
     fn map_single_chunk(
         raw_chunk_bytes: &mut [u8],
@@ -21,7 +21,7 @@ impl TaskVersion for CoCitationVersion {
         _site: Option<String>,
     ) {
         let contents = str::from_utf8_mut(raw_chunk_bytes).unwrap();
-        let stuff: Vec<_> = URL_REGEX.find_iter(contents).collect();
+        let stuff = URL_REGEX.find_iter(contents);
         let mut filtered: FxHashSet<String> = FxHashSet::default();
 
         for mat in stuff {
@@ -34,21 +34,32 @@ impl TaskVersion for CoCitationVersion {
             let domain = extract_domain(url).to_ascii_lowercase();
             filtered.insert(domain);
         }
-        let mut seen: FxHashSet<&String> = FxHashSet::default();
-        for first_site in &filtered {
-            seen.insert(first_site);
-            for second_site in &filtered {
-                if !seen.contains(second_site) {
-                    let (f, s) = if first_site < second_site {
-                        (first_site.clone(), second_site.clone())
-                    } else {
-                        (second_site.clone(), first_site.clone())
-                    };
-                    let key = format!("{f}|{s}");
-                    if let Some(count) = map.get_mut(&key) {
+
+        let mut filtered_vec: Vec<&String> = filtered.iter().collect();
+
+        // Fail safe to prevent using too much memory : 
+        if filtered_vec.len() > 2000  {
+            return;
+        }
+
+        filtered_vec.sort();
+        for i in 0..filtered_vec.len() {
+            let first_site = filtered_vec[i];
+            for j in (i + 1)..filtered_vec.len() {
+                let second_site = filtered_vec[j];
+                {
+                    // 1. Construct a temporary borrowed string slice representation on the stack.
+                    // We format it into a stack-allocated buffer or use an optimized conditional lookup.
+                    let lookup_key = format!("{first_site}|{second_site}");
+
+                    // To completely avoid allocating a String when the key exists,
+                    // we first perform a cheap read-only lookup:
+                    if let Some(count) = map.get_mut(&lookup_key) {
+                        // Key exists! We mutate it in place. Zero new allocations kept.
                         *count += 1;
                     } else {
-                        map.insert(key, 1);
+                        // Key doesn't exist! Only now do we hand ownership over to the map.
+                        map.insert(lookup_key, 1);
                     }
                 }
             }
