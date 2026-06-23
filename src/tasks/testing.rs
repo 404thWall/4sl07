@@ -314,7 +314,11 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
             map_input_size += ret.get(2).unwrap().1;
             map_saving_time += ret.get(3).unwrap().1;
             map_output_size += ret.get(4).unwrap().1;
-            println!("{ret:?}. ETA: {:.1}s", (map_mapping_time + map_reading_time + map_saving_time) * ((map_count - i - 1) as f64 / (i + 1) as f64));
+            println!(
+                "{ret:?}. ETA: {:.1}s",
+                (map_mapping_time + map_reading_time + map_saving_time)
+                    * ((map_count - i - 1) as f64 / (i + 1) as f64)
+            );
         } else {
             panic!("Failed to start map task {i}.")
         }
@@ -355,7 +359,10 @@ pub fn run_all(map_count: usize, reduce_count: usize, version: MapReduceVersion)
         reduce_input_size += ret.first().unwrap().1;
         reduce_output_size += ret.get(1).unwrap().1;
         reduce_reducing_time += ret.get(2).unwrap().1;
-        println!("Done: {ret:?}. Reduce ETA: {:.1}s", (reduce_reducing_time) * ((reduce_count - r - 1) as f64 / (r + 1) as f64));
+        println!(
+            "Done: {ret:?}. Reduce ETA: {:.1}s",
+            (reduce_reducing_time) * ((reduce_count - r - 1) as f64 / (r + 1) as f64)
+        );
     }
     println!(
         "Finished reduce tasks at {}s.",
