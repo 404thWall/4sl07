@@ -112,6 +112,19 @@ impl ServerHandler for MainServer {
         tx: Sender<OutMsg>,
         addr: SocketAddr,
     ) -> Result<Option<Packet>, ProtocolError> {
+        if CONNECTED_FILE_PORT.read().await.get(&addr.to_string()).is_none() {
+            if let Packet::Connect(_) = packet {
+                // Do nothing
+            } else {
+                println!(
+                    "Received packet {:?} from {} but the worker is not connected, ignoring",
+                    packet, addr
+                );
+                tx.send(OutMsg::MsgPacket(Packet::GiveTask { task: Task::None, files_hosts: vec![] })).await.ok();
+                return Ok(None);
+            }
+        }
+
         match packet {
             Packet::Ping => {
                 println!("Received Ping from {}, sending Pong...", addr);
@@ -222,7 +235,7 @@ impl ServerHandler for MainServer {
         }
         println!("Ping task for {} stopped", addr);
 
-        return end_connection(addr).await;
+        end_connection(addr).await
     }
 }
 
