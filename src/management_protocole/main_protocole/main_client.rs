@@ -452,26 +452,31 @@ async fn send_result_files(user: String, host_address: String) {
             crate::tasks::RESULT_SCP_PATH,
         );
 
-        if let Ok(c_command) = CString::new(command_str) {
-            unsafe {
-                // Appelle directement le système pour lancer la commande via /bin/sh
-                let status = libc::system(c_command.as_ptr());
-                if status == 0 {
-                    println!("Files successfully sent !");
-                    return;
-                } else {
-                    println!("Error executing scp: {}", status);
+        match CString::new(command_str) {
+            Ok(c_command) => {
+                unsafe {
+                    // Appelle directement le système pour lancer la commande via /bin/sh
+                    let status = libc::system(c_command.as_ptr());
+                    if status == 0 {
+                        println!("Files successfully sent !");
+                        return;
+                    } else {
+                        println!("Error executing scp: {}", status);
+                    }
                 }
             }
-        } else {
-            eprintln!("Error creating scp command");
+            Err(e) => {
+                println!("Error creating scp command: {}", e);
+            }
         }
 
+        println!("Failed to send files, retrying if possible...");
         tries += 1;
         if tries >= 10 {
-            eprintln!("Failed after 10 attempts, giving up.");
+            println!("Failed after 10 attempts, giving up.");
             return;
         }
+        println!("Retrying in 3 seconds...");
         tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
